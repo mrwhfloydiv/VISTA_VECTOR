@@ -888,13 +888,13 @@
         #callsign-btn:hover { background: rgba(124,200,161,0.1);
             box-shadow: 0 0 20px rgba(124,200,161,0.2); transform: scale(1.05); }
         .retry-msg {
-            font-family: 'IBM Plex Mono', monospace; font-size: 14px;
-            color: #7cc8a1; margin-top: 20px; display: none;
-            padding: 10px 30px; border: 1px solid rgba(124,200,161,0.4);
-            background: rgba(124,200,161,0.05);
+            font-family: 'IBM Plex Mono', monospace; font-size: 16px;
+            color: #7cc8a1; margin-top: 16px; display: none;
+            padding: 12px 40px; border: 1px solid rgba(124,200,161,0.5);
+            background: rgba(124,200,161,0.08);
             animation: retryPulse 2s ease-in-out infinite; cursor: pointer;
-            text-align: center; letter-spacing: 4px;
-            transition: all 0.2s;
+            text-align: center; letter-spacing: 5px;
+            transition: all 0.2s; z-index: 5;
         }
         .retry-msg:hover {
             background: rgba(124,200,161,0.15);
@@ -1130,8 +1130,8 @@
                 <div class="go-leaderboard-title">HIGH SCORES</div>
                 <div id="go-lb-list"></div>
             </div>
-            <div class="retry-msg" id="retry-msg">CLICK TO RETRY</div>
         </div>
+        <div class="retry-msg" id="retry-msg">CLICK TO RETRY</div>
     </div>
 
 <script type="importmap">
@@ -1188,33 +1188,33 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         groundY: -8,
 
         // ── Star Fox Control Tunables ──────────────────────
-        // Reticle (fastest element — immediate response)
-        reticleSpeed: 25,           // how fast reticle chases mouse (higher = snappier)
+        // Reticle (fastest element — immediate, independent response)
+        reticleSpeed: 35,           // how fast reticle chases mouse (higher = snappier)
         reticleSmoothing: 0.92,     // 0 = no smoothing, 1 = full smooth (low-pass filter)
-        reticleBoundsX: 0.85,      // reticle max range as fraction of half-screen
-        reticleBoundsY: 0.75,      // reticle max range vertical
-        reticleReturnSpeed: 3.0,    // how fast reticle returns to center when idle
+        reticleBoundsX: 0.95,      // reticle max range — WIDER than ship range
+        reticleBoundsY: 0.85,      // reticle max range vertical — WIDER than ship
+        reticleReturnSpeed: 4.0,    // how fast reticle returns to center when idle
 
-        // Ship follow (weighted, trails behind reticle)
-        shipFollowScale: 0.10,     // Star Fox SmoothStep scale (fraction of gap per frame)
-        shipFollowMaxStep: 35,     // max world-units/sec the ship can chase
+        // Ship follow (trails behind reticle at ~40% responsiveness)
+        shipFollowScale: 0.40,     // 40% of gap per frame — Star Fox feel
+        shipFollowMaxStep: 45,     // max world-units/sec the ship can chase
         shipFollowMinStep: 0.05,   // minimum movement to avoid stalling
         shipLateralAmp: 1.4,       // Star Fox 1.4x lateral amplification
-        shipBoundsX: 0.42,         // ship max X as fraction of worldWidth
+        shipBoundsX: 0.42,         // ship max X as fraction of worldWidth — narrower than reticle
         shipBoundsYLow: -5,        // ship min Y (relative to groundY)
         shipBoundsYHigh: 11,       // ship max Y
 
         // Banking & body language
         bankAmount: 0.65,          // max bank angle in radians (~37 degrees)
-        bankScale: 0.12,           // how fast bank responds (SmoothStep scale)
-        bankMaxStep: 4.0,          // max bank change per second
-        bankReturnStep: 1.5,       // slower return to neutral
-        pitchAmount: 0.15,         // max pitch angle in radians
-        pitchScale: 0.10,          // pitch response speed
+        bankScale: 0.15,           // how fast bank responds (SmoothStep scale)
+        bankMaxStep: 5.0,          // max bank change per second
+        bankReturnStep: 2.0,       // return to neutral
+        pitchAmount: 0.18,         // max pitch angle in radians
+        pitchScale: 0.12,          // pitch response speed
 
-        // Shooting alignment
-        shotAimInfluence: 0.35,    // 0=straight forward, 1=fully aimed at reticle
-        shotConvergeZ: -25,        // Z distance where shots converge at reticle point
+        // Shooting alignment — bullets converge at reticle's 3D position
+        shotAimInfluence: 0.50,    // 0=straight forward, 1=fully aimed at reticle
+        shotConvergeZ: -30,        // Z distance where shots converge at reticle point (~30 units ahead)
 
         // Sensitivity
         mouseSensitivity: 1.0,     // multiplier for mouse input
@@ -2418,7 +2418,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                             spawnEnemyBullet(p.x, p.y, p.z, tx - 6, ty, tz, speed * 0.8);
                             spawnEnemyBullet(p.x, p.y, p.z, tx + 6, ty, tz, speed * 0.8);
                         } else {
+                            // Spreadsheet Goblin — center shot + spread so stationary player WILL get hit
                             const speed = 18;
+                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed);        // dead center
                             spawnEnemyBullet(p.x, p.y, p.z, tx - 3, ty, tz, speed);
                             spawnEnemyBullet(p.x, p.y, p.z, tx + 3, ty, tz, speed);
                         }
@@ -2434,21 +2436,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                             e.bossShots = 0;    // track shots fired while immune
                         }
                     } else if (e.bossPhase === 1) {
-                        // Phase 1: Arrived — IMMUNE, settling into position, actively shooting
-                        // Boss must fire at least 2 volleys AND wait 2.5s before becoming vulnerable
+                        // Phase 1: Arrived — brief settle, NO shooting while immune
                         e.bossTimer += dt;
                         p.z += ((-40) - p.z) * dt;
 
-                        // Boss shoots while immune
-                        e.shootTimer -= dt;
-                        if (e.shootTimer <= 0) {
-                            e.shootTimer = e.shootRate * rand(0.9, 1.15);
-                            fireBossPattern(e, p);
-                            e.bossShots++;
-                        }
-
-                        // Transition to vulnerable only after enough time AND shots
-                        if (e.bossTimer >= 2.5 && e.bossShots >= 2) {
+                        // Become vulnerable after short settle (1s)
+                        if (e.bossTimer >= 1.0) {
                             e.bossPhase = 2;
                         }
                     } else {
@@ -2465,7 +2458,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                             e.shootTimer = e.shootRate * rand(0.9, 1.15);
                             fireBossPattern(e, p);
                         }
-                        if (e.type === 'spreadsheetGoblin' && e.hp === Math.floor(e.maxHp*0.5)) {
+                        if (e.type === 'spreadsheetGoblin' && !e.spawnedMinions && e.hp <= Math.floor(e.maxHp*0.5)) {
+                            e.spawnedMinions = true;
                             for (let m=0;m<4;m++) spawnEnemy('badData');
                         }
                     }
@@ -3549,36 +3543,35 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             const halfW = CFG.worldWidth * 0.5;
             const halfH = CFG.worldHeight * 0.4;
 
-            // ── STEP 1: RETICLE (fastest, most responsive element) ──
+            // ── STEP 1: RETICLE (independent, fastest element — direct mouse response) ──
             if (input.active) {
-                // Raw target from mouse, bounded within gameplay area
+                // Raw target from mouse, bounded within wider gameplay area
                 reticle.rawX = clamp(input.ndcX * sens, -CFG.reticleBoundsX, CFG.reticleBoundsX);
                 reticle.rawY = clamp(input.ndcY * sens, -CFG.reticleBoundsY, CFG.reticleBoundsY);
             } else {
                 // Return to center when mouse leaves
-                reticle.rawX = smoothStep(reticle.rawX, 0, 0.15, CFG.reticleReturnSpeed * dt, 0.001);
-                reticle.rawY = smoothStep(reticle.rawY, 0, 0.15, CFG.reticleReturnSpeed * dt, 0.001);
+                reticle.rawX = smoothStep(reticle.rawX, 0, 0.20, CFG.reticleReturnSpeed * dt, 0.001);
+                reticle.rawY = smoothStep(reticle.rawY, 0, 0.20, CFG.reticleReturnSpeed * dt, 0.001);
             }
 
-            // Smooth the reticle — fast but not jittery
+            // Reticle moves FAST — near-instant response, wider range than ship
             const retTargetX = reticle.rawX * halfW;
             const retTargetY = reticle.rawY * halfH + 2;
-            reticle.x = smoothStep(reticle.x, retTargetX, 0.35, CFG.reticleSpeed * dt * halfW, 0.01);
-            reticle.y = smoothStep(reticle.y, retTargetY, 0.35, CFG.reticleSpeed * dt * halfH, 0.01);
+            reticle.x = smoothStep(reticle.x, retTargetX, 0.55, CFG.reticleSpeed * dt * halfW, 0.01);
+            reticle.y = smoothStep(reticle.y, retTargetY, 0.55, CFG.reticleSpeed * dt * halfH, 0.01);
 
-            // ── STEP 2: SHIP FOLLOW (weighted, trails behind reticle) ──
-            // Star Fox SmoothStepToF: ship chases reticle with scale + maxStep clamping
+            // ── STEP 2: SHIP FOLLOW (~40% responsiveness, trails behind reticle) ──
+            // Star Fox SmoothStepToF: ship chases reticle with visible lag
             const shipMaxX = CFG.worldWidth * CFG.shipBoundsX;
             const shipTargetX = reticle.x * CFG.shipLateralAmp; // 1.4x lateral amp like Star Fox
             const shipTargetY = reticle.y;
 
-            // Adaptive follow: larger gap = more aggressive chase (committed turns feel snappier)
+            // Ship follows at CFG.shipFollowScale (~40%) — clearly slower than reticle
             const gapX = Math.abs(shipTargetX - player.x);
-            const gapY = Math.abs(shipTargetY - player.y);
-            const adaptiveScale = CFG.shipFollowScale * (1 + clamp(gapX / halfW, 0, 1) * 1.0);
+            const adaptiveScale = CFG.shipFollowScale * (1 + clamp(gapX / halfW, 0, 1) * 0.5);
 
             player.x = smoothStep(player.x, shipTargetX, adaptiveScale, CFG.shipFollowMaxStep * dt, CFG.shipFollowMinStep * dt);
-            player.y = smoothStep(player.y, shipTargetY, adaptiveScale, CFG.shipFollowMaxStep * dt * 0.8, CFG.shipFollowMinStep * dt);
+            player.y = smoothStep(player.y, shipTargetY, adaptiveScale * 0.8, CFG.shipFollowMaxStep * dt * 0.7, CFG.shipFollowMinStep * dt);
 
             // Clamp ship to bounds
             player.x = clamp(player.x, -shipMaxX, shipMaxX);
