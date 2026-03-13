@@ -1200,7 +1200,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         shipFollowScale: 0.40,     // 40% of gap per frame — Star Fox feel
         shipFollowMaxStep: 45,     // max world-units/sec the ship can chase
         shipFollowMinStep: 0.05,   // minimum movement to avoid stalling
-        shipLateralAmp: 1.4,       // Star Fox 1.4x lateral amplification
+        shipLateralAmp: 1.0,       // ship chases reticle directly, no overshoot
         shipBoundsX: 0.42,         // ship max X as fraction of worldWidth — narrower than reticle
         shipBoundsYLow: -5,        // ship min Y (relative to groundY)
         shipBoundsYHigh: 11,       // ship max Y
@@ -1224,6 +1224,22 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     // ── Three.js Setup — Camera higher/further for Star Fox chase cam ──
     const scene = new THREE.Scene();
     const _v3 = new THREE.Vector3(); // reusable scratch vector
+    const _targetQuat = new THREE.Quaternion();
+    const _aimQuat = new THREE.Quaternion();
+    const _bankQuat = new THREE.Quaternion();
+    const _slerpEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const _baseQuat = new THREE.Quaternion();
+    const _aimDir = new THREE.Vector3();
+    const _aimNear = new THREE.Vector3();
+    const _aimFar = new THREE.Vector3();
+    const _lookTarget = new THREE.Vector3();
+    const _lookMat = new THREE.Matrix4();
+    const _up = new THREE.Vector3(0, 1, 0);
+    const CONVERGE_DIST_MAX = 180;
+    const CONVERGE_DIST_MIN = 10;
+    const CONVERGE_SNAP_RADIUS = 100; // pixels — screen-space targeting threshold
+    let currentConvergeDist = CONVERGE_DIST_MAX;
+    const _projV = new THREE.Vector3();
     scene.background = new THREE.Color(BG);
     scene.fog = new THREE.FogExp2(BG, 0.006);
 
@@ -1780,25 +1796,41 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
     // Star Fox-style aiming: bullets fire from wings, aimed PARALLEL toward reticle direction
     // All bullets share the same aim vector (from ship center to reticle) so they never cross
+    const _bulletNear = new THREE.Vector3();
+    const _bulletFar = new THREE.Vector3();
+    const _bulletDir = new THREE.Vector3();
+
     function spawnBullet(x, y, spreadOffsetX) {
+        // Unproject mouse NDC into a world-space ray through the camera
+        _bulletNear.set(input.ndcX, input.ndcY, 0).unproject(camera);
+        _bulletFar.set(input.ndcX, input.ndcY, 1).unproject(camera);
+        _bulletDir.copy(_bulletFar).sub(_bulletNear).normalize();
+
+        // Intersect ray with the convergence Z plane to get aim direction from ship center
+        const convergeZ = CFG.playerZ - currentConvergeDist;
+        const t = (convergeZ - _bulletNear.z) / _bulletDir.z;
+        const targetX = _bulletNear.x + _bulletDir.x * t;
+        const targetY = _bulletNear.y + _bulletDir.y * t;
+
+        // Shared aim direction from ship center — both bullets fly parallel
+        const dx = targetX - player.x;
+        const dy = targetY - player.y;
+        const dz = convergeZ - CFG.playerZ;
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        const spawnZ = CFG.playerZ - 2;
         const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
-        mesh.position.set(x, y, CFG.playerZ - 2);
+        mesh.position.set(x, y, spawnZ);
         mesh.rotation.x = Math.PI / 2;
         const glow = new THREE.Mesh(bulletGlowGeo, bulletGlowMat.clone());
         mesh.add(glow);
         scene.add(mesh);
-        const speed = CFG.bulletSpeed;
-        // Aim direction from SHIP CENTER (not bullet position) — keeps wing shots parallel
-        const aimX = reticle.x - player.x;
-        const aimY = reticle.y - player.y;
-        const aimZ = CFG.shotConvergeZ;
-        const aimLen = Math.sqrt(aimX*aimX + aimY*aimY + aimZ*aimZ);
-        const inf = CFG.shotAimInfluence;
+
         bullets.push({
             mesh,
-            vx: (spreadOffsetX || 0) + (aimX / aimLen) * speed * inf,
-            vy: (aimY / aimLen) * speed * inf,
-            vz: -speed * (1 - inf * 0.1),
+            vx: (dx / len) * CFG.bulletSpeed,
+            vy: (dy / len) * CFG.bulletSpeed,
+            vz: (dz / len) * CFG.bulletSpeed,
         });
         shotsFired++;
     }
@@ -3368,7 +3400,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             playerMesh.visible = (gameState === 'TITLE');
             if (gameState === 'TITLE') {
                 playerMesh.position.y = Math.sin(titleTime * 0.8) * 0.3;
-                playerMesh.rotation.z = Math.sin(titleTime * 0.5) * 0.05;
+                _slerpEuler.set(0, 0, Math.sin(titleTime * 0.5) * 0.05, 'YXZ');
+                playerMesh.quaternion.setFromEuler(_slerpEuler);
             }
         }
     }
@@ -3381,7 +3414,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             camera.position.set(baseCamPos.x, baseCamPos.y, 22);
             camera.lookAt(0, 1, -50);
             // Reset ship orientation
-            if (playerMesh) { playerMesh.position.y = 0; playerMesh.rotation.z = 0; }
+            if (playerMesh) { playerMesh.position.y = 0; playerMesh.quaternion.copy(_baseQuat); }
             return;
         }
         // Ease-out cubic
@@ -3397,7 +3430,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         // Ease ship back to center
         if (playerMesh) {
             playerMesh.position.y = playerMesh.position.y * (1 - t * 0.1);
-            playerMesh.rotation.z = playerMesh.rotation.z * (1 - t * 0.1);
+            playerMesh.quaternion.slerp(_baseQuat, t * 0.1);
         }
     }
 
@@ -3580,33 +3613,25 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             const halfW = CFG.worldWidth * 0.5;
             const halfH = CFG.worldHeight * 0.4;
 
-            // ── STEP 1: RETICLE (independent, fastest element — direct mouse response) ──
+            // ── STEP 1: RETICLE (tracks mouse exactly) ──
             if (input.active) {
-                // Raw target from mouse, bounded within wider gameplay area
                 reticle.rawX = clamp(input.ndcX * sens, -CFG.reticleBoundsX, CFG.reticleBoundsX);
                 reticle.rawY = clamp(input.ndcY * sens, -CFG.reticleBoundsY, CFG.reticleBoundsY);
             } else {
-                // Return to center when mouse leaves
                 reticle.rawX = smoothStep(reticle.rawX, 0, 0.20, CFG.reticleReturnSpeed * dt, 0.001);
                 reticle.rawY = smoothStep(reticle.rawY, 0, 0.20, CFG.reticleReturnSpeed * dt, 0.001);
             }
 
-            // Reticle moves FAST — near-instant response, wider range than ship
-            const retTargetX = reticle.rawX * halfW;
-            const retTargetY = reticle.rawY * halfH + 2;
-            reticle.x = smoothStep(reticle.x, retTargetX, 0.55, CFG.reticleSpeed * dt * halfW, 0.01);
-            reticle.y = smoothStep(reticle.y, retTargetY, 0.55, CFG.reticleSpeed * dt * halfH, 0.01);
+            reticle.x = reticle.rawX * halfW;
+            reticle.y = reticle.rawY * halfH + 2;
 
-            // ── STEP 2: SHIP FOLLOW (~40% responsiveness, trails behind reticle) ──
-            // Star Fox SmoothStepToF: ship chases reticle with visible lag
+            // ── STEP 2: SHIP FOLLOW ──
             const shipMaxX = CFG.worldWidth * CFG.shipBoundsX;
-            const shipTargetX = reticle.x * CFG.shipLateralAmp; // 1.4x lateral amp like Star Fox
+            const shipTargetX = reticle.x * CFG.shipLateralAmp;
             const shipTargetY = reticle.y;
 
-            // Ship follows at CFG.shipFollowScale (~40%) — clearly slower than reticle
             const gapX = Math.abs(shipTargetX - player.x);
             const adaptiveScale = CFG.shipFollowScale * (1 + clamp(gapX / halfW, 0, 1) * 0.5);
-
             player.x = smoothStep(player.x, shipTargetX, adaptiveScale, CFG.shipFollowMaxStep * dt, CFG.shipFollowMinStep * dt);
             player.y = smoothStep(player.y, shipTargetY, adaptiveScale * 0.8, CFG.shipFollowMaxStep * dt * 0.7, CFG.shipFollowMinStep * dt);
 
@@ -3614,33 +3639,67 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             player.x = clamp(player.x, -shipMaxX, shipMaxX);
             player.y = clamp(player.y, CFG.groundY + 3, CFG.shipBoundsYHigh);
 
-            // ── STEP 3: BANKING & BODY LANGUAGE ──
-            // Bank is derived from OFFSET between reticle and ship (not velocity)
-            // This is the key Star Fox feel: ship leans INTO the direction it's chasing
-            const offsetX = reticle.x - player.x; // positive = reticle is right of ship
-            const targetBank = clamp(offsetX / (halfW * 0.3), -1, 1) * CFG.bankAmount;
-            const bankStep = Math.abs(targetBank) > Math.abs(player.bankAngle) ? CFG.bankMaxStep : CFG.bankReturnStep;
-            player.bankAngle = smoothStep(player.bankAngle, targetBank, CFG.bankScale, bankStep * dt, 0.001);
+            // ── DYNAMIC CONVERGENCE — soft lock-on to nearest enemy under crosshair ──
+            let targetConvergeDist = CONVERGE_DIST_MAX;
+            let closestScreenDist = Infinity;
+            const cursorPxX = input.x;
+            const cursorPxY = input.y;
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            for (let ei = 0; ei < enemies.length; ei++) {
+                const e = enemies[ei];
+                if (!e.alive) continue;
+                const ep = e.mesh.position;
+                _projV.set(ep.x, ep.y, ep.z).project(camera);
+                const sx = (_projV.x * 0.5 + 0.5) * winW;
+                const sy = (-_projV.y * 0.5 + 0.5) * winH;
+                const dx = sx - cursorPxX;
+                const dy = sy - cursorPxY;
+                const screenDist = Math.sqrt(dx * dx + dy * dy);
+                if (screenDist < CONVERGE_SNAP_RADIUS && screenDist < closestScreenDist) {
+                    closestScreenDist = screenDist;
+                    targetConvergeDist = clamp(CFG.playerZ - ep.z, CONVERGE_DIST_MIN, CONVERGE_DIST_MAX);
+                }
+            }
+            currentConvergeDist += (targetConvergeDist - currentConvergeDist) * clamp(5 * dt, 0, 1);
 
-            // Pitch: ship nose follows vertical aim offset
-            const offsetY = reticle.y - player.y;
-            const targetPitch = clamp(offsetY / (halfH * 0.4), -1, 1) * CFG.pitchAmount;
-            player.pitchAngle = smoothStep(player.pitchAngle, targetPitch, CFG.pitchScale, 2.0 * dt, 0.001);
+            // ── STEP 3: SHIP ROTATION — lookAt convergence point + bank ──
+            // Unproject mouse NDC through camera (identical to bullet code)
+            _aimNear.set(input.ndcX, input.ndcY, 0).unproject(camera);
+            _aimFar.set(input.ndcX, input.ndcY, 1).unproject(camera);
+            _aimDir.copy(_aimFar).sub(_aimNear).normalize();
+            const convergeZ = CFG.playerZ - currentConvergeDist;
+            const aimT = (convergeZ - _aimNear.z) / _aimDir.z;
+            const aimTargetX = _aimNear.x + _aimDir.x * aimT;
+            const aimTargetY = _aimNear.y + _aimDir.y * aimT;
 
-            // Apply to mesh
+            // LookAt: ship eye → convergence point gives correct yaw + pitch naturally
+            _lookTarget.set(aimTargetX, aimTargetY, convergeZ);
+            _lookMat.lookAt(playerMesh.position, _lookTarget, _up);
+            _aimQuat.setFromRotationMatrix(_lookMat);
+
+            // Bank: layered as pure roll around the local forward axis (doesn't corrupt aim)
+            _aimDir.set(aimTargetX - player.x, aimTargetY - player.y, convergeZ - CFG.playerZ).normalize();
+            const lateralVel = (player.x - prevPlayerX) / Math.max(dt, 0.001);
+            const targetBank = clamp(lateralVel / 30, -1, 1) * 0.4;
+            _bankQuat.setFromAxisAngle(_aimDir, targetBank);
+
+            // Final: bank * lookAt * baseOrientation
+            _targetQuat.copy(_bankQuat).multiply(_aimQuat).multiply(_baseQuat);
+
+            // Slerp current orientation toward target
+            playerMesh.quaternion.slerp(_targetQuat, clamp(6 * dt, 0, 1));
+
+            // Apply position
             playerMesh.position.set(player.x, player.y, CFG.playerZ);
-            playerMesh.rotation.z = -player.bankAngle;
-            playerMesh.rotation.x = -player.pitchAngle;
             prevPlayerX = player.x;
 
             // ── STEP 4: RETICLE HUD POSITIONING ──
-            // Project reticle world position to screen via camera
+            // Place directly at mouse/touch pixel coordinates — no projection
             const reticleEl = document.querySelector('.hud-reticle-system');
             if (reticleEl) {
-                const aimWorld = _v3.set(reticle.x, reticle.y + 0.5, CFG.shotConvergeZ);
-                aimWorld.project(camera);
-                const rx = clamp((aimWorld.x * 0.5 + 0.5) * 100, 3, 97);
-                const ry = clamp((-aimWorld.y * 0.5 + 0.5) * 100, 3, 97);
+                const rx = clamp((input.x / window.innerWidth) * 100, 1, 99);
+                const ry = clamp((input.y / window.innerHeight) * 100, 1, 99);
                 reticleEl.style.left = rx + '%';
                 reticleEl.style.top = ry + '%';
 
@@ -3763,7 +3822,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         cameraTransitioning = false;
         camera.position.set(baseCamPos.x, baseCamPos.y, 22);
         camera.lookAt(0, 1, -50);
-        if (playerMesh) { playerMesh.visible = true; playerMesh.position.y = 0; playerMesh.rotation.z = 0; }
+        if (playerMesh) { playerMesh.visible = true; playerMesh.position.y = 0; playerMesh.quaternion.copy(_baseQuat); }
 
         gameState = 'PLAYING';
         startupGrace = 0.5;
@@ -3821,7 +3880,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     createSpeedLines();
     createSpaceDust();
     createPlayerShip();
-    if (playerMesh) playerMesh.visible = false; // hidden until TITLE state
+    if (playerMesh) {
+        playerMesh.updateMatrixWorld(true);
+        _baseQuat.copy(playerMesh.quaternion);
+        playerMesh.visible = false; // hidden until TITLE state
+    }
     setupReticleTicks();
     setupDevPanel();
 
