@@ -4159,13 +4159,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             prevPlayerX = player.x;
 
             // ── STEP 4: RETICLE HUD POSITIONING ──
-            // Project reticle world position to screen via camera
+            // Place directly at mouse/touch pixel coordinates — pixel-locked to cursor
             const reticleEl = document.querySelector('.hud-reticle-system');
             if (reticleEl) {
-                const aimWorld = _v3.set(reticle.x, reticle.y + 0.5, CFG.shotConvergeZ);
-                aimWorld.project(camera);
-                const rx = clamp((aimWorld.x * 0.5 + 0.5) * 100, 3, 97);
-                const ry = clamp((-aimWorld.y * 0.5 + 0.5) * 100, 3, 97);
+                const rx = clamp((input.x / window.innerWidth) * 100, 1, 99);
+                const ry = clamp((input.y / window.innerHeight) * 100, 1, 99);
                 reticleEl.style.left = rx + '%';
                 reticleEl.style.top = ry + '%';
 
