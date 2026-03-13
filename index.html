@@ -1393,8 +1393,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     }
 
     function updateGround(dt) {
-        // Only scroll grid during gameplay — static during orbit/intro
-        if (gameState !== 'PLAYING') return;
+        // Only scroll grid during gameplay and death sequence — static during orbit/intro
+        if (gameState !== 'PLAYING' && gameState !== 'DYING') return;
         const speed = 55;
         for (const gl of groundLines) {
             gl.z += speed * dt;
@@ -2774,7 +2774,28 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         }
         if (currentHP <= 0) {
             lives--;
-            if (lives <= 0) { gameOver(); return; }
+            if (lives <= 0) {
+                // === DEATH SEQUENCE: Big explosion, hide ship, delay, then game over ===
+                gameState = 'DYING';
+                playerMesh.visible = false;
+                // Massive multi-stage explosion
+                spawnExplosion(player.x, player.y, CFG.playerZ, 0xff4444, 50, 25, 0.8);
+                spawnShockwave(player.x, player.y, CFG.playerZ, 0xff2200);
+                shakeIntensity = 2.0;
+                // Secondary explosions after short delays
+                setTimeout(() => {
+                    spawnExplosion(player.x + 2, player.y + 1, CFG.playerZ - 1, 0xffaa00, 30, 20, 0.5);
+                    spawnShockwave(player.x, player.y, CFG.playerZ, 0xff6600);
+                    shakeIntensity = Math.max(shakeIntensity, 1.5);
+                }, 300);
+                setTimeout(() => {
+                    spawnExplosion(player.x - 1, player.y - 1, CFG.playerZ + 1, 0xffcc33, 25, 15, 0.4);
+                    shakeIntensity = Math.max(shakeIntensity, 1.0);
+                }, 600);
+                // Show game over after explosion settles (2 seconds)
+                setTimeout(() => gameOver(), 2000);
+                return;
+            }
             // If somehow more lives (shouldn't happen with maxLives=1)
             lastLifeLostTime = performance.now();
             currentHP = CFG.hitsPerLife;
@@ -2861,6 +2882,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     let highScores = [];
     function loadScores() {
         try { highScores = JSON.parse(localStorage.getItem('vistavector_scores') || '[]'); } catch(e) { highScores = []; }
+        return highScores;
     }
     function saveScore(n, s) {
         highScores.push({ name: n.toUpperCase(), score: s, date: Date.now() });
@@ -3263,9 +3285,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         saveScore(callsign, score);
         callsignSubmitted = true;
         document.getElementById('callsign-wrap').style.display = 'none';
-        // Show leaderboard
-        showLeaderboard(callsign, score);
         document.getElementById('retry-msg').style.display = 'block';
+        // Show leaderboard (after retry so retry always appears)
+        showLeaderboard(callsign, score);
     }
     function showLeaderboard(currentName, currentScore) {
         const lb = document.getElementById('go-leaderboard');
