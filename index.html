@@ -272,113 +272,143 @@
             100% { box-shadow: 0 0 12px rgba(181,217,238,0.5); filter: brightness(1); }
         }
 
-        /* ── Bottom Center Health Bar ── */
+        /* ── Bottom Center Health Bar — Parallelogram/Skewed Style ── */
         .hud-health-zone {
-            position: absolute; bottom: clamp(16px, 2.5vh, 36px); left: 50%;
+            position: absolute; bottom: clamp(14px, 2.5vh, 32px); left: 50%;
             transform: translateX(-50%); text-align: center;
-            width: clamp(300px, 30vw, 500px);
+            width: clamp(320px, 35vw, 560px);
         }
         .health-bar-container {
             position: relative; width: 100%;
-            height: clamp(10px, 1.2vh, 16px); border-radius: 4px;
+            height: clamp(22px, 2.8vh, 36px);
         }
         .health-bar-bg {
             position: relative; width: 100%; height: 100%;
-            background: rgba(232,232,232,0.06); border-radius: 4px;
-            overflow: hidden; border: 1px solid rgba(232,232,232,0.1);
+            background: rgba(2,3,6,0.85);
+            overflow: hidden;
+            border: 1px solid rgba(181,217,238,0.2);
+            clip-path: polygon(3% 0%, 100% 0%, 97% 100%, 0% 100%);
+        }
+        .health-bar-bg::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(180deg, rgba(181,217,238,0.06) 0%, rgba(2,3,6,0.4) 100%);
         }
         .health-bar-fill {
-            position: absolute; top: 0; left: 0; height: 100%; width: 100%;
-            border-radius: 3px; background: #7cc8a1; overflow: hidden;
-            transition: width 0.3s ease-out, background-color 0.5s;
-            box-shadow: 0 0 12px rgba(124,200,161,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+            position: absolute; top: 2px; left: 2px; bottom: 2px; width: calc(100% - 4px);
+            background: linear-gradient(180deg, #8fd9b3, #5ab88a);
+            overflow: hidden;
+            transition: width 0.3s ease-out, background 0.5s;
+            box-shadow: 0 0 15px rgba(124,200,161,0.5), 0 0 30px rgba(124,200,161,0.2);
         }
-        .health-bar-fill.full { background: linear-gradient(180deg, #8fd9b3, #7cc8a1); box-shadow: 0 0 12px rgba(124,200,161,0.4), inset 0 1px 0 rgba(255,255,255,0.15); }
-        .health-bar-fill.mid  { background: linear-gradient(180deg, #f0be3a, #ebaa1f); box-shadow: 0 0 12px rgba(235,170,31,0.4), inset 0 1px 0 rgba(255,255,255,0.15); }
-        .health-bar-fill.low  { background: linear-gradient(180deg, #d44040, #b22c2e); box-shadow: 0 0 16px rgba(178,44,46,0.5), inset 0 1px 0 rgba(255,255,255,0.1); animation: healthCritical 0.6s ease-in-out infinite; }
+        .health-bar-fill.full {
+            background: linear-gradient(180deg, #8fd9b3, #5ab88a);
+            box-shadow: 0 0 15px rgba(124,200,161,0.5), 0 0 30px rgba(124,200,161,0.2);
+        }
+        .health-bar-fill.mid {
+            background: linear-gradient(180deg, #f5c842, #e09a10);
+            box-shadow: 0 0 15px rgba(235,170,31,0.5), 0 0 30px rgba(235,170,31,0.2);
+        }
+        .health-bar-fill.low {
+            background: linear-gradient(180deg, #e04545, #b22c2e);
+            box-shadow: 0 0 20px rgba(178,44,46,0.6), 0 0 40px rgba(178,44,46,0.3);
+            animation: healthCritical 0.5s ease-in-out infinite;
+        }
         @keyframes healthCritical {
-            0%, 100% { box-shadow: 0 0 16px rgba(178,44,46,0.5), inset 0 1px 0 rgba(255,255,255,0.1); }
-            50%      { box-shadow: 0 0 30px rgba(178,44,46,0.8), 0 0 60px rgba(178,44,46,0.3), inset 0 1px 0 rgba(255,255,255,0.1); }
+            0%, 100% { box-shadow: 0 0 20px rgba(178,44,46,0.6); }
+            50%      { box-shadow: 0 0 40px rgba(178,44,46,0.9), 0 0 70px rgba(178,44,46,0.4); filter: brightness(1.3); }
         }
         .health-segment {
-            position: absolute; top: 0; width: 1px; height: 100%;
-            background: rgba(2,3,6,0.35); z-index: 2;
+            position: absolute; top: 0; width: 2px; height: 100%;
+            background: rgba(2,3,6,0.6); z-index: 2;
+            transform: skewX(-8deg);
+        }
+        /* Outer frame accent lines */
+        .health-bar-container::before {
+            content: ''; position: absolute; top: -3px; left: 5%; width: 90%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.25), transparent);
+        }
+        .health-bar-container::after {
+            content: ''; position: absolute; bottom: -3px; left: 5%; width: 90%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.15), transparent);
         }
         /* Health bar damage shake */
         .health-bar-container.hit-shake { animation: healthHitShake 0.35s ease-out; }
         @keyframes healthHitShake {
             0%   { transform: translateX(0); }
-            15%  { transform: translateX(-6px); }
-            30%  { transform: translateX(5px); }
+            15%  { transform: translateX(-8px); }
+            30%  { transform: translateX(6px); }
             45%  { transform: translateX(-4px); }
             60%  { transform: translateX(3px); }
-            80%  { transform: translateX(-1px); }
             100% { transform: translateX(0); }
         }
-        /* Health bar damage flash */
         .health-bar-fill.hit-flash { animation: healthHitFlash 0.3s ease-out; }
         @keyframes healthHitFlash {
-            0%   { filter: brightness(3) saturate(0); }
+            0%   { filter: brightness(4) saturate(0); }
             30%  { filter: brightness(2) saturate(0.5); }
             100% { filter: brightness(1) saturate(1); }
         }
-        /* Life lost — bar flash white then reset */
         .health-bar-fill.life-lost-flash { animation: lifeLostFlash 0.6s ease-out; }
         @keyframes lifeLostFlash {
             0%   { filter: brightness(1); }
-            15%  { filter: brightness(5); }
+            15%  { filter: brightness(6); }
             40%  { filter: brightness(3); }
             100% { filter: brightness(1); }
         }
-        /* Hull pip explosion */
         .hull-pip-explode { display: inline-block; animation: pipExplode 0.5s ease-out forwards; }
         @keyframes pipExplode {
             0%   { transform: scale(1); opacity: 1; color: #b22c2e; }
             30%  { transform: scale(2.5); opacity: 0.8; color: #ffffff; text-shadow: 0 0 12px #b22c2e; }
             100% { transform: scale(0); opacity: 0; }
         }
-        /* Health bar shine sweep */
+        /* Shine sweep across the parallelogram bar */
         .health-bar-fill::after {
-            content: ''; position: absolute; top: 0; left: -50%; width: 50%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            animation: healthShineSweep 4s ease-in-out infinite; pointer-events: none;
+            content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+            animation: healthShineSweep 3s ease-in-out infinite; pointer-events: none;
+            transform: skewX(-15deg);
         }
         @keyframes healthShineSweep {
-            0%   { left: -50%; }
-            40%  { left: 110%; }
-            100% { left: 110%; }
+            0%   { left: -60%; }
+            40%  { left: 120%; }
+            100% { left: 120%; }
         }
         .health-bar-glow {
-            position: absolute; top: 50%; left: 5%; width: 90%; height: 200%;
+            position: absolute; top: 50%; left: 5%; width: 90%; height: 250%;
             transform: translateY(-50%); border-radius: 50%;
-            background: radial-gradient(ellipse, rgba(124,200,161,0.08) 0%, transparent 70%);
+            background: radial-gradient(ellipse, rgba(124,200,161,0.1) 0%, transparent 70%);
             pointer-events: none; transition: background 0.5s; z-index: -1;
         }
         .health-shield-overlay {
             position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px;
-            border-radius: 5px; border: 1px solid transparent;
+            border: 1px solid transparent;
+            clip-path: polygon(3% 0%, 100% 0%, 97% 100%, 0% 100%);
             overflow: hidden; opacity: 0; transition: opacity 0.3s; z-index: 3;
         }
         .health-shield-overlay.active {
-            opacity: 1; border-color: rgba(124,200,161,0.3);
-            animation: shieldShimmer 2s linear infinite;
+            opacity: 1; border-color: rgba(124,200,161,0.4);
+            animation: shieldShimmer 1.5s linear infinite;
         }
         .health-shield-fill {
             height: 100%; width: 100%;
-            background: linear-gradient(90deg, rgba(124,200,161,0.15), rgba(124,200,161,0.08));
+            background: linear-gradient(90deg, rgba(124,200,161,0.2), rgba(124,200,161,0.08));
             transition: width 0.3s;
         }
         @keyframes shieldShimmer {
-            0%   { border-color: rgba(124,200,161,0.2); }
-            50%  { border-color: rgba(124,200,161,0.45); }
-            100% { border-color: rgba(124,200,161,0.2); }
+            0%   { border-color: rgba(124,200,161,0.2); box-shadow: 0 0 8px rgba(124,200,161,0.1); }
+            50%  { border-color: rgba(124,200,161,0.5); box-shadow: 0 0 20px rgba(124,200,161,0.3); }
+            100% { border-color: rgba(124,200,161,0.2); box-shadow: 0 0 8px rgba(124,200,161,0.1); }
         }
         .health-info-row {
-            display: flex; justify-content: center; align-items: center; gap: 12px;
-            margin-top: 6px; font-size: clamp(10px, 1vw, 14px); letter-spacing: 3px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 6px; padding: 0 4%;
+            font-size: clamp(9px, 0.9vw, 12px); letter-spacing: 3px;
         }
-        .health-label { color: rgba(181,217,238,0.35); font-weight: 600; }
-        .health-pips { color: rgba(232,232,232,0.6); font-size: clamp(10px, 1vw, 14px); letter-spacing: 4px; }
+        .health-label { color: rgba(181,217,238,0.4); font-weight: 700; text-transform: uppercase; }
+        .health-hp-text {
+            color: rgba(181,217,238,0.7); font-weight: 700; font-size: clamp(11px, 1.1vw, 15px);
+            text-shadow: 0 0 6px rgba(181,217,238,0.2);
+        }
+        .health-pips { color: rgba(232,232,232,0.6); font-size: clamp(10px, 1vw, 14px); letter-spacing: 4px; display: none; }
         .health-shield-text { color: #7cc8a1; font-weight: 700; text-shadow: 0 0 8px rgba(124,200,161,0.4); }
 
         /* ── Bottom Right GIS Strike ── */
@@ -670,48 +700,58 @@
            GAME OVER — Dramatic Assessment
            ═══════════════════════════════════════════════════ */
         #gameover-screen {
-            background: rgba(2,3,6,0.95); display: none;
-            backdrop-filter: blur(6px);
+            background: rgba(2,3,6,0.97); display: none;
         }
-        /* Animated background particles for game over */
+        /* CRT scanlines overlay */
         #gameover-screen::before {
             content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background:
-                radial-gradient(ellipse at 30% 20%, rgba(178,44,46,0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 70% 80%, rgba(235,170,31,0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(181,217,238,0.04) 0%, transparent 60%);
-            animation: goAmbient 8s ease-in-out infinite alternate;
-            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 2px,
+                rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px
+            );
+            pointer-events: none; z-index: 1;
         }
-        @keyframes goAmbient {
-            0% { opacity: 0.5; transform: scale(1); }
-            100% { opacity: 1; transform: scale(1.05); }
-        }
-        /* Scan line sweep on game over */
+        /* CRT flicker + scan sweep */
         #gameover-screen::after {
             content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(180deg, transparent 0%, rgba(181,217,238,0.03) 50%, transparent 100%);
-            background-size: 100% 200%;
-            animation: goScanSweep 4s linear infinite;
-            pointer-events: none;
+            background: linear-gradient(180deg, transparent 0%, rgba(181,217,238,0.04) 50%, transparent 100%);
+            background-size: 100% 40%;
+            animation: crtScanSweep 3s linear infinite;
+            pointer-events: none; z-index: 1;
         }
-        @keyframes goScanSweep {
-            0% { background-position: 0% 0%; }
-            100% { background-position: 0% 200%; }
+        @keyframes crtScanSweep {
+            0% { background-position: 0% -40%; }
+            100% { background-position: 0% 140%; }
+        }
+        /* CRT screen curve vignette */
+        .go-crt-vignette {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+            pointer-events: none; z-index: 1;
+        }
+        /* CRT flicker animation on container */
+        #gameover-screen .go-frame {
+            animation: goFrameIn 0.6s ease-out 0.2s forwards, crtFlicker 0.15s infinite;
+        }
+        @keyframes crtFlicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.98; }
         }
 
         .go-frame {
-            position: relative; padding: 35px 45px;
-            border: 1px solid rgba(181,217,238,0.12);
-            background: rgba(2,3,6,0.7);
-            max-width: 420px; width: 92%;
-            opacity: 0; animation: goFrameIn 0.6s ease-out 0.2s forwards;
-            box-shadow: 0 0 60px rgba(2,3,6,0.8), 0 0 120px rgba(181,217,238,0.03);
+            position: relative; padding: 30px 40px;
+            border: 1px solid rgba(181,217,238,0.15);
+            background: rgba(2,3,6,0.85);
+            max-width: 440px; width: 92%; z-index: 2;
+            opacity: 0;
+            box-shadow: 0 0 80px rgba(2,3,6,0.9), 0 0 2px rgba(181,217,238,0.2),
+                        inset 0 0 60px rgba(0,0,0,0.3);
         }
         @keyframes goFrameIn {
-            0% { opacity: 0; transform: scale(0.9) translateY(20px); }
-            60% { transform: scale(1.02) translateY(-2px); }
-            100% { opacity: 1; transform: scale(1) translateY(0); }
+            0% { opacity: 0; transform: scale(0.85) translateY(30px); filter: brightness(3); }
+            40% { filter: brightness(1.5); }
+            70% { transform: scale(1.01) translateY(-2px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
         }
         .go-frame::before, .go-frame::after {
             content: ''; position: absolute;
@@ -848,28 +888,39 @@
         .go-status.cleared { color: #7cc8a1; text-shadow: 0 0 20px rgba(124,200,161,0.5); }
         .go-status.failed { color: #b22c2e; text-shadow: 0 0 20px rgba(178,44,46,0.5); }
 
-        /* ── High Score Leaderboard ── */
+        /* ── High Score Leaderboard — CRT Style ── */
         .go-leaderboard {
-            margin-top: 16px; padding-top: 12px;
-            border-top: 1px solid rgba(181,217,238,0.08);
-            opacity: 0; animation: fadeInUp 0.5s ease-out forwards;
+            margin-top: 16px; padding: 12px 8px 8px;
+            border-top: 1px solid rgba(181,217,238,0.1);
+            background: rgba(0,0,0,0.3);
         }
         .go-leaderboard-title {
-            font-family: 'IBM Plex Mono', monospace; font-size: 9px;
-            color: rgba(235,170,31,0.5); letter-spacing: 4px; text-align: center;
-            margin-bottom: 8px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+            color: rgba(235,170,31,0.6); letter-spacing: 5px; text-align: center;
+            margin-bottom: 10px; text-shadow: 0 0 8px rgba(235,170,31,0.3);
         }
         .go-lb-row {
             display: flex; justify-content: space-between; align-items: baseline;
-            padding: 3px 0; font-family: 'IBM Plex Mono', monospace;
+            padding: 3px 6px; font-family: 'IBM Plex Mono', monospace;
+            opacity: 0; animation: lbRowIn 0.3s ease-out forwards;
+            border-bottom: 1px solid rgba(181,217,238,0.03);
         }
-        .go-lb-rank { font-size: 9px; color: rgba(181,217,238,0.3); width: 24px; }
-        .go-lb-name { font-size: 11px; color: rgba(181,217,238,0.6); letter-spacing: 2px; flex: 1; }
-        .go-lb-score { font-size: 12px; color: rgba(235,170,31,0.7); font-weight: 700; }
-        .go-lb-row.current { background: rgba(235,170,31,0.05); border-radius: 2px; padding: 3px 4px; }
-        .go-lb-row.current .go-lb-name { color: #ebaa1f; }
-        .go-lb-row.current .go-lb-score { color: #ebaa1f; text-shadow: 0 0 8px rgba(235,170,31,0.3); }
-        .go-lb-row:first-child .go-lb-score { color: #ebaa1f; }
+        @keyframes lbRowIn {
+            0% { opacity: 0; transform: translateY(4px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .go-lb-rank { font-size: 9px; color: rgba(181,217,238,0.3); width: 28px; }
+        .go-lb-name { font-size: 11px; color: rgba(181,217,238,0.5); letter-spacing: 3px; flex: 1; }
+        .go-lb-score { font-size: 12px; color: rgba(181,217,238,0.6); font-weight: 700; }
+        .go-lb-row:first-child .go-lb-rank { color: rgba(235,170,31,0.6); }
+        .go-lb-row:first-child .go-lb-name { color: rgba(235,170,31,0.8); }
+        .go-lb-row:first-child .go-lb-score { color: #ebaa1f; text-shadow: 0 0 10px rgba(235,170,31,0.4); }
+        .go-lb-row.current {
+            background: rgba(235,170,31,0.06); border-left: 2px solid rgba(235,170,31,0.5);
+            padding-left: 8px;
+        }
+        .go-lb-row.current .go-lb-name { color: #ebaa1f; text-shadow: 0 0 6px rgba(235,170,31,0.3); }
+        .go-lb-row.current .go-lb-score { color: #ebaa1f; text-shadow: 0 0 10px rgba(235,170,31,0.4); }
 
         /* Callsign */
         #callsign-wrap { margin-top: 16px; text-align: center; }
@@ -1022,7 +1073,7 @@
             <div class="hub-bracket-bottom"></div>
         </div>
 
-        <!-- Bottom Center Health Bar -->
+        <!-- Bottom Center Health Bar — Parallelogram Style -->
         <div class="hud-health-zone">
             <div class="health-bar-container">
                 <div class="health-shield-overlay" id="shield-bar">
@@ -1036,9 +1087,9 @@
                 <div class="health-bar-glow" id="health-glow"></div>
             </div>
             <div class="health-info-row">
-                <span class="health-label">HULL</span>
+                <span class="health-label">HULL INTEGRITY</span>
+                <span class="health-hp-text" id="health-hp-text">3 / 3</span>
                 <span class="health-pips" id="hull-pips">&#x25CF; &#x25CF; &#x25CF;</span>
-                <span class="health-label" style="font-size:8px;opacity:0.4">SHIPS</span>
                 <span class="health-shield-text" id="shield-status"></span>
             </div>
         </div>
@@ -1110,6 +1161,7 @@
 
     <!-- ═══ Game Over ═══ -->
     <div id="gameover-screen">
+        <div class="go-crt-vignette"></div>
         <div class="go-frame">
             <div class="go-header">
                 <h2 data-text="VISTA VECTOR">VISTA VECTOR</h2>
@@ -1117,10 +1169,10 @@
             </div>
             <div class="go-line"></div>
             <div id="go-stats">
-                <div class="stat-group" style="animation-delay:0.3s"><span class="stat-label">THREATS NEUTRALIZED</span><span class="stat-value" id="go-kills">0</span></div>
-                <div class="stat-group" style="animation-delay:0.6s"><span class="stat-label">ACCURACY</span><span class="stat-value" id="go-acc">0%</span></div>
-                <div class="stat-group" style="animation-delay:0.9s"><span class="stat-label">WAVES CLEARED</span><span class="stat-value" id="go-waves">0</span></div>
-                <div class="stat-group" style="animation-delay:1.2s"><span class="stat-label">FINAL SCORE</span><span class="stat-value gold" id="go-score">0</span></div>
+                <div class="stat-group" style="animation-delay:0.3s"><span class="stat-label">&gt; THREATS NEUTRALIZED</span><span class="stat-value" id="go-kills">0</span></div>
+                <div class="stat-group" style="animation-delay:0.6s"><span class="stat-label">&gt; ACCURACY</span><span class="stat-value" id="go-acc">0%</span></div>
+                <div class="stat-group" style="animation-delay:0.9s"><span class="stat-label">&gt; WAVES CLEARED</span><span class="stat-value" id="go-waves">0</span></div>
+                <div class="stat-group" style="animation-delay:1.2s"><span class="stat-label">&gt; FINAL SCORE</span><span class="stat-value gold" id="go-score">0</span></div>
             </div>
             <div class="go-grade" id="go-grade" style="animation-delay:1.6s">B</div>
             <div class="go-status" id="go-status"></div>
@@ -2289,6 +2341,52 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         return group;
     }
 
+    // ── Enemy Health Bar Sprites ──
+    function createEnemyHealthBar(maxHp, isBoss) {
+        const w = isBoss ? 128 : 64;
+        const h = 8;
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(isBoss ? 6 : 3, isBoss ? 0.4 : 0.2, 1);
+        sprite.renderOrder = 999;
+        return { sprite, canvas, texture, ctx: canvas.getContext('2d'), w, h };
+    }
+
+    function updateEnemyHealthBarVisibility(e) {
+        if (!e.healthBar) return;
+        // Only show health bar when enemy has taken damage
+        e.healthBar.sprite.visible = (e.hp < e.maxHp && e.hp > 0);
+    }
+
+    function updateEnemyHealthBar(hb, hp, maxHp, color) {
+        const ctx = hb.ctx;
+        const w = hb.w, h = hb.h;
+        const pct = Math.max(0, hp / maxHp);
+        ctx.clearRect(0, 0, w, h);
+        // Background
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, w, h);
+        // Border
+        ctx.strokeStyle = 'rgba(181,217,238,0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, w-1, h-1);
+        // Fill — color based on HP %
+        let fillColor;
+        if (pct > 0.6) fillColor = '#7cc8a1';
+        else if (pct > 0.3) fillColor = '#ebaa1f';
+        else fillColor = '#b22c2e';
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(1, 1, (w-2) * pct, h-2);
+        // Bright edge highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillRect(1, 1, (w-2) * pct, 1);
+        hb.texture.needsUpdate = true;
+    }
+
     function spawnEnemy(typeName) {
         const et = ETYPES[typeName];
         const wv = WAVES[waveIndex];
@@ -2301,6 +2399,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         mesh.position.set(startX, startY, CFG.enemySpawnZ);
         scene.add(mesh);
 
+        // Create health bar above enemy
+        const hb = createEnemyHealthBar(et.hp, isBoss);
+        hb.sprite.position.set(0, isBoss ? 5 : 2.5, 0);
+        mesh.add(hb.sprite);
+        updateEnemyHealthBar(hb, et.hp, et.hp, et.color);
+        hb.sprite.visible = false; // hidden until damaged
+
         enemies.push({
             mesh, type: typeName,
             hp: et.hp, maxHp: et.hp, pts: et.pts,
@@ -2312,6 +2417,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             targetX: startX, targetY: startY,
             bossPhase: 0, bossTimer: 0,
             color: et.color,
+            healthBar: hb,
         });
     }
 
@@ -2610,8 +2716,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 if (dx*dx + dy*dy + dz*dz < hitR*hitR + 1) {
                     b.dead = true; shotsHit++;
                     e.hp--; e.flashTimer = 0.08;
+                    if (e.healthBar) { updateEnemyHealthBar(e.healthBar, e.hp, e.maxHp, e.color); updateEnemyHealthBarVisibility(e); }
                     const ep = e.mesh.position;
-                    spawnExplosion(ep.x, ep.y, ep.z, e.color, 5, 10, 0.25);
                     // Reticle hit feedback — sustain glow while landing hits
                     reticleHitTimer = 0.3;
                     // Re-trigger shake animation on each hit
@@ -2972,6 +3078,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             }
         }
 
+        // HP numeric display
+        const hpTextEl = document.getElementById('health-hp-text');
+        if (hpTextEl) hpTextEl.textContent = currentHP + ' / ' + CFG.hitsPerLife;
+
         // Hull pips — show SHIPS remaining
         let pipHtml = '';
         const recentLifeLoss = (performance.now() - lastLifeLostTime) < 500;
@@ -3224,14 +3334,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const scores = loadScores();
         if (scores.length === 0) return;
         lb.style.display = 'block';
-        // Reset animation
         lb.style.animation = 'none'; lb.offsetHeight; lb.style.animation = '';
         let html = '';
-        const top5 = scores.slice(0, 5);
-        top5.forEach((s, i) => {
+        const top10 = scores.slice(0, 10);
+        top10.forEach((s, i) => {
             const isCurrent = (s.name === currentName && s.score === currentScore);
-            html += '<div class="go-lb-row' + (isCurrent ? ' current' : '') + '">';
-            html += '<span class="go-lb-rank">' + (i+1) + '.</span>';
+            const rankStr = (i+1 < 10 ? '0' : '') + (i+1);
+            html += '<div class="go-lb-row' + (isCurrent ? ' current' : '') + '" style="animation-delay:' + (i * 0.08) + 's">';
+            html += '<span class="go-lb-rank">' + rankStr + '</span>';
             html += '<span class="go-lb-name">' + s.name + '</span>';
             html += '<span class="go-lb-score">' + s.score.toLocaleString() + '</span>';
             html += '</div>';
