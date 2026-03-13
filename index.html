@@ -674,15 +674,16 @@
            ═══════════════════════════════════════════════════ */
         #gameover-screen {
             background: rgba(2,3,6,0.93); display: none;
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(6px);
+            overflow: hidden; /* NO scrollbar ever */
         }
 
         .go-frame {
-            position: relative; padding: 24px 32px;
+            position: relative; padding: 20px 28px;
             border: 1px solid rgba(181,217,238,0.15);
-            background: rgba(2,3,6,0.92);
-            max-width: 420px; width: 90%; z-index: 2;
-            opacity: 0;
+            background: rgba(2,3,6,0.95);
+            max-width: 400px; width: 92%; z-index: 2;
+            opacity: 0; max-height: 90vh;
             animation: goFrameIn 0.8s ease-out 0.3s forwards;
             box-shadow: 0 0 80px rgba(2,3,6,0.9), 0 0 2px rgba(181,217,238,0.2),
                         inset 0 0 60px rgba(0,0,0,0.3);
@@ -1788,17 +1789,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         mesh.add(glow);
         scene.add(mesh);
         const speed = CFG.bulletSpeed;
-        // Aim direction from SHIP CENTER (not bullet position) — keeps wing shots parallel
-        const aimX = reticle.x - player.x;
-        const aimY = reticle.y - player.y;
-        const aimZ = CFG.shotConvergeZ;
-        const aimLen = Math.sqrt(aimX*aimX + aimY*aimY + aimZ*aimZ);
-        const inf = CFG.shotAimInfluence;
+        // Bullets fire straight forward — parallel wing lasers that NEVER cross
+        // Slight lateral tracking toward reticle X offset for aiming feel
+        const aimX = (reticle.x - player.x) * 0.08; // very subtle lateral drift
         bullets.push({
             mesh,
-            vx: (spreadOffsetX || 0) + (aimX / aimLen) * speed * inf,
-            vy: (aimY / aimLen) * speed * inf,
-            vz: -speed * (1 - inf * 0.1),
+            vx: (spreadOffsetX || 0) + aimX,
+            vy: 0,
+            vz: -speed,
         });
         shotsFired++;
     }
@@ -1912,10 +1910,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         permittingDelay:    { hp:10, pts:350, color:0xcc5555, speed:15, behavior:'drift',    scale:1.8, shootRate:2.0 },
         workforceSwarm:     { hp:1,  pts:50,  color:0x70aa70, speed:35, behavior:'swarm',    scale:0.6, shootRate:0 },
         notProjectReady:    { hp:5,  pts:500, color:0xdd4444, speed:28, behavior:'zigzag',   scale:1.3, shootRate:1.5 },
-        spreadsheetGoblin:  { hp:50,  pts:2500, color:0x55bb55, speed:12, behavior:'boss', scale:3.0, shootRate:1.6 },
-        captainUtility:     { hp:65,  pts:3500, color:0x6666bb, speed:14, behavior:'boss', scale:2.8, shootRate:1.4 },
-        permitKraken:       { hp:85,  pts:5000, color:0xcc4444, speed:10, behavior:'boss', scale:3.5, shootRate:1.1 },
-        unknownUnknown:     { hp:120, pts:7000, color:0xaa44aa, speed:12, behavior:'boss', scale:3.2, shootRate:0.85 },
+        spreadsheetGoblin:  { hp:80,  pts:2500, color:0x55bb55, speed:12, behavior:'boss', scale:3.0, shootRate:1.5 },
+        captainUtility:     { hp:120, pts:3500, color:0x6666bb, speed:14, behavior:'boss', scale:2.8, shootRate:1.2 },
+        permitKraken:       { hp:160, pts:5000, color:0xcc4444, speed:10, behavior:'boss', scale:3.5, shootRate:1.0 },
+        unknownUnknown:     { hp:220, pts:7000, color:0xaa44aa, speed:12, behavior:'boss', scale:3.2, shootRate:0.75 },
     };
 
     function createEnemyMesh(type, et) {
@@ -2412,13 +2410,19 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                                 spawnEnemyBullet(p.x, p.y, p.z, tx + 3, ty + 2, tz, speed * 0.8);
                             }
                         } else if (e.type === 'permitKraken') {
+                            // Kraken: 6-shot ring spread — tentacle spray
                             const speed = 20;
-                            for (let a = -2; a <= 2; a++) { if (a === 0) continue; spawnEnemyBullet(p.x, p.y, p.z, tx + a * 5, ty, tz, speed); }
+                            for (let a = -3; a <= 3; a++) {
+                                spawnEnemyBullet(p.x, p.y, p.z, tx + a * 4, ty + Math.abs(a) * 1.5, tz, speed * rand(0.85, 1.1));
+                            }
                         } else if (e.type === 'captainUtility') {
-                            const speed = 20;
-                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed);
-                            spawnEnemyBullet(p.x, p.y, p.z, tx - 6, ty, tz, speed * 0.8);
-                            spawnEnemyBullet(p.x, p.y, p.z, tx + 6, ty, tz, speed * 0.8);
+                            // Captain: Tight aimed triple + side flankers
+                            const speed = 24;
+                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed);           // dead center fast
+                            spawnEnemyBullet(p.x, p.y, p.z, tx - 1, ty + 0.5, tz, speed); // tight spread
+                            spawnEnemyBullet(p.x, p.y, p.z, tx + 1, ty + 0.5, tz, speed);
+                            spawnEnemyBullet(p.x, p.y, p.z, tx - 8, ty, tz, speed * 0.65); // wide flankers
+                            spawnEnemyBullet(p.x, p.y, p.z, tx + 8, ty, tz, speed * 0.65);
                         } else {
                             // Spreadsheet Goblin — center shot + spread so stationary player WILL get hit
                             const speed = 18;
@@ -2447,22 +2451,120 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                             e.bossPhase = 2;
                         }
                     } else {
-                        // Phase 2: Fighting — VULNERABLE, moving and shooting
+                        // Phase 2: Fighting — VULNERABLE, unique movement per boss
                         e.bossTimer += dt;
-                        const tx = Math.sin(e.bossTimer * 0.6) * CFG.worldWidth * 0.3;
-                        const ty = 2 + Math.sin(e.bossTimer * 0.35) * 3;
-                        p.x += (tx - p.x) * 2 * dt;
-                        p.y += (ty - p.y) * 2 * dt;
                         p.z += ((-40) - p.z) * dt;
 
+                        if (e.type === 'spreadsheetGoblin') {
+                            // ── SPREADSHEET GOBLIN: Slow, deliberate side-to-side patrol ──
+                            const tx = Math.sin(e.bossTimer * 0.45) * CFG.worldWidth * 0.25;
+                            const ty = 2 + Math.sin(e.bossTimer * 0.25) * 1.5;
+                            p.x += (tx - p.x) * 1.5 * dt;
+                            p.y += (ty - p.y) * 1.5 * dt;
+                            // Summon minions at 50% HP
+                            if (!e.spawnedMinions && e.hp <= Math.floor(e.maxHp * 0.5)) {
+                                e.spawnedMinions = true;
+                                for (let m = 0; m < 4; m++) spawnEnemy('badData');
+                            }
+
+                        } else if (e.type === 'captainUtility') {
+                            // ── CAPTAIN UTILITY: Aggressive charge-and-retreat ──
+                            // Charges toward player every ~4s, then retreats
+                            if (!e.chargeState) e.chargeState = 'strafe';
+                            if (!e.chargeCooldown) e.chargeCooldown = 3.0;
+                            e.chargeCooldown -= dt;
+
+                            if (e.chargeState === 'strafe') {
+                                // Fast lateral strafing
+                                const tx = Math.sin(e.bossTimer * 1.2) * CFG.worldWidth * 0.35;
+                                const ty = 3 + Math.sin(e.bossTimer * 0.8) * 2;
+                                p.x += (tx - p.x) * 3 * dt;
+                                p.y += (ty - p.y) * 2 * dt;
+                                if (e.chargeCooldown <= 0) {
+                                    e.chargeState = 'charge';
+                                    e.chargeTimer = 0;
+                                }
+                            } else if (e.chargeState === 'charge') {
+                                // Rush forward toward player
+                                e.chargeTimer += dt;
+                                p.z += 18 * dt;  // surge forward
+                                p.x += (player.x - p.x) * 3 * dt; // track player X
+                                if (e.chargeTimer > 0.8 || p.z > -20) {
+                                    e.chargeState = 'retreat';
+                                    e.chargeTimer = 0;
+                                }
+                            } else {
+                                // Pull back to safe distance
+                                e.chargeTimer += dt;
+                                p.z += ((-40) - p.z) * 3 * dt;
+                                if (e.chargeTimer > 1.2) {
+                                    e.chargeState = 'strafe';
+                                    e.chargeCooldown = rand(2.5, 4.5);
+                                }
+                            }
+                            // Rapid burst during charge
+                            if (e.chargeState === 'charge') {
+                                e.shootTimer -= dt * 3; // triple fire rate while charging
+                            }
+
+                        } else if (e.type === 'permitKraken') {
+                            // ── PERMIT KRAKEN: Wide figure-8 sweep ──
+                            const t = e.bossTimer * 0.5;
+                            const tx = Math.sin(t) * CFG.worldWidth * 0.4;
+                            const ty = 3 + Math.sin(t * 2) * 3.5;
+                            p.x += (tx - p.x) * 2.5 * dt;
+                            p.y += (ty - p.y) * 2.5 * dt;
+                            // Subtle Z weaving — comes closer then backs off
+                            const tz = -40 + Math.sin(e.bossTimer * 0.3) * 8;
+                            p.z += (tz - p.z) * 1.5 * dt;
+                            // Spawn stealth "ink" minions at 60% and 30% HP
+                            if (!e.inkWave1 && e.hp <= Math.floor(e.maxHp * 0.6)) {
+                                e.inkWave1 = true;
+                                for (let m = 0; m < 3; m++) spawnEnemy('stealth');
+                            }
+                            if (!e.inkWave2 && e.hp <= Math.floor(e.maxHp * 0.3)) {
+                                e.inkWave2 = true;
+                                for (let m = 0; m < 4; m++) spawnEnemy('stealth');
+                            }
+
+                        } else if (e.type === 'unknownUnknown') {
+                            // ── UNKNOWN UNKNOWN: Teleport/blink pattern ──
+                            if (!e.blinkTimer) e.blinkTimer = rand(2.5, 4.0);
+                            if (!e.blinkTargetX) e.blinkTargetX = 0;
+                            if (!e.blinkTargetY) e.blinkTargetY = 3;
+                            e.blinkTimer -= dt;
+
+                            if (e.blinkTimer <= 0) {
+                                // Teleport to new random position
+                                e.blinkTargetX = rand(-CFG.worldWidth * 0.35, CFG.worldWidth * 0.35);
+                                e.blinkTargetY = rand(1, 7);
+                                e.blinkTimer = rand(2.0, 3.5);
+                                // Flash effect — briefly invisible
+                                e.mesh.visible = false;
+                                setTimeout(() => { if (e.mesh) e.mesh.visible = true; }, 150);
+                            }
+                            // Snap to blink target (fast interpolation)
+                            p.x += (e.blinkTargetX - p.x) * 8 * dt;
+                            p.y += (e.blinkTargetY - p.y) * 8 * dt;
+                            // Shield phase at 50% — briefly invulnerable with visual cue
+                            if (!e.shieldUsed && e.hp <= Math.floor(e.maxHp * 0.5)) {
+                                e.shieldUsed = true;
+                                e.shieldTimer = 3.0; // 3 seconds of shield
+                            }
+                            if (e.shieldTimer > 0) {
+                                e.shieldTimer -= dt;
+                                // Visual pulse while shielded
+                                e.mesh.material && (e.mesh.children.forEach(c => {
+                                    if (c.material) c.material.opacity = 0.4 + Math.sin(e.bossTimer * 10) * 0.3;
+                                }));
+                            }
+                        }
+
+                        // Shooting — all bosses
                         e.shootTimer -= dt;
                         if (e.shootTimer <= 0) {
                             e.shootTimer = e.shootRate * rand(0.9, 1.15);
                             fireBossPattern(e, p);
-                        }
-                        if (e.type === 'spreadsheetGoblin' && !e.spawnedMinions && e.hp <= Math.floor(e.maxHp*0.5)) {
-                            e.spawnedMinions = true;
-                            for (let m=0;m<4;m++) spawnEnemy('badData');
                         }
                     }
                     break;
@@ -2650,6 +2752,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 if (!e.alive) continue;
                 // Bosses are immune during entrance (phase 0) and arrival grace (phase 1)
                 if (e.behavior === 'boss' && e.bossPhase < 2) continue;
+                // Unknown Unknown shield phase — absorbs hits
+                if (e.shieldTimer > 0) { b.dead = true; spawnExplosion(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 0xaa44aa, 3, 5, 0.2); continue; }
                 const dx = b.mesh.position.x - e.mesh.position.x;
                 const dy = b.mesh.position.y - e.mesh.position.y;
                 const dz = b.mesh.position.z - e.mesh.position.z;
@@ -2781,6 +2885,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 playerMesh.visible = false;
                 deathSound.currentTime = 0;
                 deathSound.play().catch(() => {});
+                // Fade out soundtrack over 2 seconds
+                const fadeOut = setInterval(() => {
+                    if (soundtrack.volume > 0.05) soundtrack.volume -= 0.05;
+                    else { soundtrack.pause(); soundtrack.volume = 0.4; clearInterval(fadeOut); }
+                }, 150);
                 // Massive multi-stage explosion
                 spawnExplosion(player.x, player.y, CFG.playerZ, 0xff4444, 50, 25, 0.8);
                 spawnShockwave(player.x, player.y, CFG.playerZ, 0xff2200);
@@ -2836,6 +2945,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         for (const e of enemies) {
             // Bosses in entrance/grace phase are immune to GIS Strike too
             if (e.behavior === 'boss' && e.bossPhase < 2) continue;
+            // Unknown Unknown shield absorbs GIS Strike (takes damage but doesn't die)
+            if (e.shieldTimer > 0) { e.shieldTimer = 0; e.hp = Math.max(1, e.hp - Math.floor(e.maxHp * 0.2)); continue; }
             score += e.pts * (scoreMultTimer>0?2:1);
             totalKills++;
             const ep = e.mesh.position;
@@ -3205,6 +3316,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         cameraTransitioning = true;
         camTransitionProgress = 0;
 
+        // Restart soundtrack
+        soundtrack.currentTime = 0;
+        soundtrack.volume = 0.4;
+        soundtrack.play().catch(() => {});
+
         gameState = 'PLAYING';
         startupGrace = 0.5; // half-second grace period to prevent accidental GIS Strike
         specialTrigger = false; // clear any pending trigger
@@ -3280,6 +3396,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const frame = go.querySelector('.go-frame');
         if (frame) { frame.style.animation = 'none'; frame.offsetHeight; frame.style.animation = ''; }
 
+        // Reset all sections for fresh game over display
+        document.getElementById('go-stats').style.display = '';
+        document.getElementById('go-grade').style.display = '';
+        document.getElementById('go-status').style.display = '';
+        document.querySelector('.go-line').style.display = '';
         document.getElementById('callsign-wrap').style.display = 'block';
         document.getElementById('retry-msg').style.display = 'none';
         document.getElementById('go-leaderboard').style.display = 'none';
@@ -3295,9 +3416,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const callsign = n.slice(0, 2);
         saveScore(callsign, score);
         callsignSubmitted = true;
+        // Phase 2: Hide callsign + stats, show leaderboard + retry
         document.getElementById('callsign-wrap').style.display = 'none';
+        document.getElementById('go-stats').style.display = 'none';
+        document.getElementById('go-grade').style.display = 'none';
+        document.getElementById('go-status').style.display = 'none';
+        document.querySelector('.go-line').style.display = 'none';
         document.getElementById('retry-msg').style.display = 'block';
-        // Show leaderboard (after retry so retry always appears)
         showLeaderboard(callsign, score);
     }
     function showLeaderboard(currentName, currentScore) {
