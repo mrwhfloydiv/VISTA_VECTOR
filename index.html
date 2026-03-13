@@ -1174,7 +1174,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     const CFG = {
         fireRate: 0.13,
         bulletSpeed: 80,
-        playerEase: 14,
         invulnTime: 1.8,
         maxLives: 1,
         hitsPerLife: 3,
@@ -1187,9 +1186,41 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         worldWidth: 40,
         worldHeight: 25,
         enemySpawnZ: -200,
-        enemyDespawnZ: 5, // despawn sooner after passing player (was 15)
+        enemyDespawnZ: 5,
         playerZ: 0,
         groundY: -8,
+
+        // ── Star Fox Control Tunables ──────────────────────
+        // Reticle (fastest element — immediate response)
+        reticleSpeed: 25,           // how fast reticle chases mouse (higher = snappier)
+        reticleSmoothing: 0.92,     // 0 = no smoothing, 1 = full smooth (low-pass filter)
+        reticleBoundsX: 0.85,      // reticle max range as fraction of half-screen
+        reticleBoundsY: 0.75,      // reticle max range vertical
+        reticleReturnSpeed: 3.0,    // how fast reticle returns to center when idle
+
+        // Ship follow (weighted, trails behind reticle)
+        shipFollowScale: 0.10,     // Star Fox SmoothStep scale (fraction of gap per frame)
+        shipFollowMaxStep: 35,     // max world-units/sec the ship can chase
+        shipFollowMinStep: 0.05,   // minimum movement to avoid stalling
+        shipLateralAmp: 1.4,       // Star Fox 1.4x lateral amplification
+        shipBoundsX: 0.42,         // ship max X as fraction of worldWidth
+        shipBoundsYLow: -5,        // ship min Y (relative to groundY)
+        shipBoundsYHigh: 11,       // ship max Y
+
+        // Banking & body language
+        bankAmount: 0.65,          // max bank angle in radians (~37 degrees)
+        bankScale: 0.12,           // how fast bank responds (SmoothStep scale)
+        bankMaxStep: 4.0,          // max bank change per second
+        bankReturnStep: 1.5,       // slower return to neutral
+        pitchAmount: 0.15,         // max pitch angle in radians
+        pitchScale: 0.10,          // pitch response speed
+
+        // Shooting alignment
+        shotAimInfluence: 0.35,    // 0=straight forward, 1=fully aimed at reticle
+        shotConvergeZ: -25,        // Z distance where shots converge at reticle point
+
+        // Sensitivity
+        mouseSensitivity: 1.0,     // multiplier for mouse input
     };
 
     // ── Three.js Setup — Camera higher/further for Star Fox chase cam ──
@@ -1248,6 +1279,24 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
     function lerp(a, b, t) { return a + (b - a) * t; }
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    // ── Star Fox SmoothStepToF — the core interpolation primitive ──
+    // Scaled-and-clamped proportional step: NOT a lerp, NOT a spring.
+    // Gives exponential-decay approach with hard speed limits.
+    // Returns new value. scale=fraction of gap per call, maxStep=speed cap, minStep=anti-stall.
+    function smoothStep(current, target, scale, maxStep, minStep) {
+        let step = (target - current) * scale;
+        if (step > maxStep) step = maxStep;
+        else if (step < -maxStep) step = -maxStep;
+        if (Math.abs(step) < minStep) {
+            if (Math.abs(target - current) < minStep) return target; // snap
+            step = target > current ? minStep : -minStep;
+        }
+        const result = current + step;
+        // Don't overshoot
+        if ((current < target && result > target) || (current > target && result < target)) return target;
+        return result;
+    }
 
     // ════════════════════════════════════════════════════════════
     //  GROUND PLANE — Brighter rushing grid
@@ -1617,7 +1666,18 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     //  PLAYER SHIP — Vista V in 3D
     // ════════════════════════════════════════════════════════════
     let playerMesh, shieldMesh;
-    const player = { x: 0, y: 0, targetX: 0, targetY: 0, bankAngle: 0 };
+    const player = {
+        x: 0, y: 2,                    // ship world position (follows reticle with lag)
+        vx: 0, vy: 0,                  // ship velocity for momentum
+        bankAngle: 0,                   // Z rotation (roll)
+        pitchAngle: 0,                  // X rotation (nose up/down)
+    };
+    // Reticle state — independent from ship, fastest element
+    const reticle = {
+        x: 0, y: 0,                    // reticle world-space position (bounded)
+        rawX: 0, rawY: 0,              // unsmoothed target from mouse
+        screenX: 50, screenY: 50,       // screen % for CSS positioning
+    };
     const shipCentroid = new THREE.Vector3(); // computed from actual geometry bounding box
 
     function createPlayerShip() {
@@ -1720,9 +1780,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         blending: THREE.AdditiveBlending,
     });
 
-    // Star Fox-style aiming: bullets fire FORWARD from wing tips
-    // Wing-tip lasers converge inward to meet at the reticle distance (~25 units ahead)
-    function spawnBullet(x, y, convergeVx) {
+    // Star Fox-style aiming: bullets fire from ship, angled toward reticle aim point
+    function spawnBullet(x, y, spreadOffsetX) {
         const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
         mesh.position.set(x, y, CFG.playerZ - 2);
         mesh.rotation.x = Math.PI / 2;
@@ -1730,11 +1789,17 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         mesh.add(glow);
         scene.add(mesh);
         const speed = CFG.bulletSpeed;
+        // Aim influence: shots angle toward where reticle is pointing
+        const aimX = reticle.x - x;  // offset from bullet spawn to reticle X
+        const aimY = reticle.y - y;  // offset from bullet spawn to reticle Y
+        const aimZ = CFG.shotConvergeZ;  // convergence distance
+        const aimLen = Math.sqrt(aimX*aimX + aimY*aimY + aimZ*aimZ);
+        const inf = CFG.shotAimInfluence;
         bullets.push({
             mesh,
-            vx: convergeVx || 0,
-            vy: 0,
-            vz: -speed,
+            vx: (spreadOffsetX || 0) + (aimX / aimLen) * speed * inf,
+            vy: (aimY / aimLen) * speed * inf,
+            vz: -speed * (1 - inf * 0.1), // slightly reduce forward speed when aiming off-center
         });
         shotsFired++;
     }
@@ -3066,7 +3131,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         fireTimer = 0; invulnTimer = 0; spreadTimer = 0; scoreMultTimer = 0; shieldHP = 0;
         shakeIntensity = 0; totalKills = 0; shotsFired = 0; shotsHit = 0;
         callsignSubmitted = false;
-        player.x = 0; player.y = 0; player.targetX = 0; player.targetY = 0; player.bankAngle = 0;
+        player.x = 0; player.y = 2; player.vx = 0; player.vy = 0; player.bankAngle = 0; player.pitchAngle = 0;
+        reticle.x = 0; reticle.y = 2; reticle.rawX = 0; reticle.rawY = 0;
         prevPlayerX = 0;
 
         bullets.forEach(b => scene.remove(b.mesh));
@@ -3419,33 +3485,77 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         if (shakeIntensity < 0.005) shakeIntensity = 0;
 
         if (gameState === 'PLAYING') {
+            // ════════════════════════════════════════════════════
+            //  STAR FOX CONTROL MODEL
+            //  Pipeline: Mouse → Reticle (fast) → Ship (weighted) → Banking → Shots
+            // ════════════════════════════════════════════════════
+
+            const sens = CFG.mouseSensitivity;
+            const halfW = CFG.worldWidth * 0.5;
+            const halfH = CFG.worldHeight * 0.4;
+
+            // ── STEP 1: RETICLE (fastest, most responsive element) ──
             if (input.active) {
-                player.targetX = input.ndcX * CFG.worldWidth * 0.5;
-                player.targetY = input.ndcY * CFG.worldHeight * 0.3 + 2;
+                // Raw target from mouse, bounded within gameplay area
+                reticle.rawX = clamp(input.ndcX * sens, -CFG.reticleBoundsX, CFG.reticleBoundsX);
+                reticle.rawY = clamp(input.ndcY * sens, -CFG.reticleBoundsY, CFG.reticleBoundsY);
             } else {
-                player.targetX += (0 - player.targetX) * 0.4 * dt;
-                player.targetY += (0 - player.targetY) * 0.4 * dt;
+                // Return to center when mouse leaves
+                reticle.rawX = smoothStep(reticle.rawX, 0, 0.15, CFG.reticleReturnSpeed * dt, 0.001);
+                reticle.rawY = smoothStep(reticle.rawY, 0, 0.15, CFG.reticleReturnSpeed * dt, 0.001);
             }
 
-            player.x += (player.targetX - player.x) * CFG.playerEase * dt;
-            player.y += (player.targetY - player.y) * CFG.playerEase * dt;
-            player.x = clamp(player.x, -CFG.worldWidth * 0.45, CFG.worldWidth * 0.45);
-            player.y = clamp(player.y, CFG.groundY + 2, 12);
+            // Smooth the reticle — fast but not jittery
+            const retTargetX = reticle.rawX * halfW;
+            const retTargetY = reticle.rawY * halfH + 2;
+            reticle.x = smoothStep(reticle.x, retTargetX, 0.35, CFG.reticleSpeed * dt * halfW, 0.01);
+            reticle.y = smoothStep(reticle.y, retTargetY, 0.35, CFG.reticleSpeed * dt * halfH, 0.01);
 
-            const velX = (player.x - prevPlayerX) / Math.max(dt, 0.001);
-            const targetBank = clamp(velX / 40, -1, 1) * 0.5;
-            player.bankAngle += (targetBank - player.bankAngle) * Math.min(1, dt * 8);
-            prevPlayerX = player.x;
+            // ── STEP 2: SHIP FOLLOW (weighted, trails behind reticle) ──
+            // Star Fox SmoothStepToF: ship chases reticle with scale + maxStep clamping
+            const shipMaxX = CFG.worldWidth * CFG.shipBoundsX;
+            const shipTargetX = reticle.x * CFG.shipLateralAmp; // 1.4x lateral amp like Star Fox
+            const shipTargetY = reticle.y;
 
+            // Adaptive follow: larger gap = more aggressive chase (committed turns feel snappier)
+            const gapX = Math.abs(shipTargetX - player.x);
+            const gapY = Math.abs(shipTargetY - player.y);
+            const adaptiveScale = CFG.shipFollowScale * (1 + clamp(gapX / halfW, 0, 1) * 1.0);
+
+            player.x = smoothStep(player.x, shipTargetX, adaptiveScale, CFG.shipFollowMaxStep * dt, CFG.shipFollowMinStep * dt);
+            player.y = smoothStep(player.y, shipTargetY, adaptiveScale, CFG.shipFollowMaxStep * dt * 0.8, CFG.shipFollowMinStep * dt);
+
+            // Clamp ship to bounds
+            player.x = clamp(player.x, -shipMaxX, shipMaxX);
+            player.y = clamp(player.y, CFG.groundY + 3, CFG.shipBoundsYHigh);
+
+            // ── STEP 3: BANKING & BODY LANGUAGE ──
+            // Bank is derived from OFFSET between reticle and ship (not velocity)
+            // This is the key Star Fox feel: ship leans INTO the direction it's chasing
+            const offsetX = reticle.x - player.x; // positive = reticle is right of ship
+            const targetBank = clamp(offsetX / (halfW * 0.3), -1, 1) * CFG.bankAmount;
+            const bankStep = Math.abs(targetBank) > Math.abs(player.bankAngle) ? CFG.bankMaxStep : CFG.bankReturnStep;
+            player.bankAngle = smoothStep(player.bankAngle, targetBank, CFG.bankScale, bankStep * dt, 0.001);
+
+            // Pitch: ship nose follows vertical aim offset
+            const offsetY = reticle.y - player.y;
+            const targetPitch = clamp(offsetY / (halfH * 0.4), -1, 1) * CFG.pitchAmount;
+            player.pitchAngle = smoothStep(player.pitchAngle, targetPitch, CFG.pitchScale, 2.0 * dt, 0.001);
+
+            // Apply to mesh
             playerMesh.position.set(player.x, player.y, CFG.playerZ);
             playerMesh.rotation.z = -player.bankAngle;
-            playerMesh.rotation.x = player.bankAngle * 0.15;
+            playerMesh.rotation.x = -player.pitchAngle;
+            prevPlayerX = player.x;
 
-            // Reticle tracks mouse directly — feels like a true shooter aim
+            // ── STEP 4: RETICLE HUD POSITIONING ──
+            // Project reticle world position to screen via camera
             const reticleEl = document.querySelector('.hud-reticle-system');
             if (reticleEl) {
-                const rx = clamp((input.ndcX * 0.5 + 0.5) * 100, 2, 98);
-                const ry = clamp((-input.ndcY * 0.5 + 0.5) * 100, 2, 98);
+                const aimWorld = _v3.set(reticle.x, reticle.y + 0.5, CFG.shotConvergeZ);
+                aimWorld.project(camera);
+                const rx = clamp((aimWorld.x * 0.5 + 0.5) * 100, 3, 97);
+                const ry = clamp((-aimWorld.y * 0.5 + 0.5) * 100, 3, 97);
                 reticleEl.style.left = rx + '%';
                 reticleEl.style.top = ry + '%';
 
@@ -3453,10 +3563,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 const wasHit = reticleEl.classList.contains('reticle-hit');
                 if (reticleHitTimer > 0) {
                     reticleHitTimer -= dt;
-                    if (!wasHit) {
-                        // Fresh hit burst — add class and trigger shake
-                        reticleEl.classList.add('reticle-hit');
-                    }
+                    if (!wasHit) reticleEl.classList.add('reticle-hit');
                 } else if (wasHit) {
                     reticleEl.classList.remove('reticle-hit');
                 }
@@ -3582,7 +3689,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         fireTimer = 0; invulnTimer = 0; spreadTimer = 0; scoreMultTimer = 0; shieldHP = 0;
         shakeIntensity = 0; totalKills = 0; shotsFired = 0; shotsHit = 0;
         callsignSubmitted = false;
-        player.x = 0; player.y = 0; player.targetX = 0; player.targetY = 0; player.bankAngle = 0;
+        player.x = 0; player.y = 2; player.vx = 0; player.vy = 0; player.bankAngle = 0; player.pitchAngle = 0;
+        reticle.x = 0; reticle.y = 2; reticle.rawX = 0; reticle.rawY = 0;
         prevPlayerX = 0;
 
         bullets.forEach(b => scene.remove(b.mesh));
