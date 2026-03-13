@@ -2072,15 +2072,29 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 b.mesh.rotation.x += dt * 6;
                 b.mesh.rotation.z += dt * 3;
             } else {
-                // Default spin
-                b.mesh.rotation.z += dt * 8;
+                // Regular enemy orbs — aggressive breathing pulse like website orbs
+                b.mesh.rotation.z += dt * 5;
+                const t = b.age;
+                // Core: rhythmic scale pulse (breathe in/out)
+                const coreScale = 1.0 + Math.sin(t * 10) * 0.4 + Math.sin(t * 17) * 0.15;
+                if (b.core) b.core.scale.setScalar(coreScale);
+                // Core: opacity flickers
+                if (b.core) b.core.material.opacity = 0.7 + Math.sin(t * 12) * 0.3;
+                // Glow: inverse pulse — expands when core shrinks
+                const glowScale = 1.0 + Math.sin(t * 10 + Math.PI) * 0.3;
+                if (b.glow) {
+                    b.glow.scale.setScalar(glowScale);
+                    b.glow.material.opacity = 0.15 + Math.sin(t * 8) * 0.2;
+                }
             }
 
-            // Pulse the core scale
-            const pulse = 1.0 + Math.sin(b.age * 15) * 0.2;
-            if (b.core) b.core.scale.setScalar(pulse);
-            // Pulse the glow opacity
-            if (b.glow) b.glow.material.opacity = 0.2 + Math.sin(b.age * 12) * 0.12;
+            // Pulse the core scale (non-regular types)
+            if (b.sourceType !== 'regular') {
+                const pulse = 1.0 + Math.sin(b.age * 15) * 0.2;
+                if (b.core) b.core.scale.setScalar(pulse);
+            }
+            // Pulse the glow opacity (non-regular types)
+            if (b.sourceType !== 'regular' && b.glow) b.glow.material.opacity = 0.2 + Math.sin(b.age * 12) * 0.12;
             // Trail follows behind the bullet (opposite of velocity direction)
             if (b.trail) {
                 const trailScale = 0.8 + Math.sin(b.age * 10) * 0.3;
@@ -2312,12 +2326,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 );
                 wireBody.position.y = -0.2*s;
                 group.add(wireBody);
-                // Aura
-                const aura = new THREE.Mesh(
-                    new THREE.SphereGeometry(3.0*s, 16, 16),
-                    new THREE.MeshBasicMaterial({ color: et.color, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending })
-                );
-                group.add(aura);
                 mainMesh = torso;
                 break;
             }
@@ -2361,12 +2369,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 );
                 shieldEdge.position.set(0, 0, 1.6*s);
                 group.add(shieldEdge);
-                // Aura
-                const aura = new THREE.Mesh(
-                    new THREE.SphereGeometry(2.8*s, 16, 16),
-                    new THREE.MeshBasicMaterial({ color: et.color, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending })
-                );
-                group.add(aura);
                 mainMesh = torso;
                 break;
             }
@@ -2426,12 +2428,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                         group.add(sucker);
                     }
                 }
-                // Aura — larger for the kraken
-                const aura = new THREE.Mesh(
-                    new THREE.SphereGeometry(3.5*s, 16, 16),
-                    new THREE.MeshBasicMaterial({ color: et.color, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending })
-                );
-                group.add(aura);
                 mainMesh = head;
                 break;
             }
@@ -2478,12 +2474,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                     group.add(frag);
                     group.userData.orbitFragments.push({ mesh: frag, angle: orbitAngle, radius: orbitR, speed: orbitSpeed, tilt: orbitTilt });
                 }
-                // Aura
-                const aura = new THREE.Mesh(
-                    new THREE.SphereGeometry(3.2*s, 16, 16),
-                    new THREE.MeshBasicMaterial({ color: et.color, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending })
-                );
-                group.add(aura);
                 mainMesh = core;
                 break;
             }
