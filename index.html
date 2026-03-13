@@ -1882,25 +1882,24 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         return new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
     })();
     const bulletMat = new THREE.MeshBasicMaterial({
-        color: 0x44ffff, transparent: true, opacity: 0.95,
+        color: 0x00ffff, transparent: true, opacity: 1.0,
         blending: THREE.AdditiveBlending,
     });
-    const bulletGlowGeo = new THREE.SphereGeometry(0.4, 6, 6);
+    const bulletGlowGeo = new THREE.SphereGeometry(0.5, 6, 6);
     const bulletGlowMat = new THREE.MeshBasicMaterial({
-        color: 0x88ffff, transparent: true, opacity: 0.25,
+        color: 0x00ffff, transparent: true, opacity: 0.45,
         blending: THREE.AdditiveBlending,
     });
-    // Plasma color cycle — shifts hue over bullet lifetime
+    // Plasma color cycle — rich, saturated hue shifting
     const _plasmaColor = new THREE.Color();
     function updatePlasmaColor(mat, glowMat, age) {
-        // Cycle through cyan → blue → magenta → white → cyan
-        const hue = (age * 0.8) % 1.0;  // full cycle every ~1.25s
-        const sat = 0.6 + Math.sin(age * 12) * 0.2; // shimmer saturation
-        const lit = 0.55 + Math.sin(age * 8) * 0.15;
-        _plasmaColor.setHSL(hue * 0.35 + 0.45, sat, lit); // range: cyan(0.5) → magenta(0.83)
+        const hue = (age * 0.8) % 1.0;
+        const sat = 1.0; // full saturation — punchy color
+        const lit = 0.65 + Math.sin(age * 10) * 0.1; // bright with shimmer
+        _plasmaColor.setHSL(hue * 0.35 + 0.45, sat, lit);
         mat.color.copy(_plasmaColor);
         if (glowMat) {
-            _plasmaColor.setHSL(hue * 0.35 + 0.45, sat * 0.8, lit + 0.15);
+            _plasmaColor.setHSL(hue * 0.35 + 0.45, sat, Math.min(lit + 0.2, 0.85));
             glowMat.color.copy(_plasmaColor);
         }
     }
