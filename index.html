@@ -1182,6 +1182,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         shieldHits: 3,
         waveAnnounceTime: 3.5,
         waveDelay: 1.2,
+        rapidFireDuration: 8,
+        homingDuration: 6,
+        timeSlowDuration: 5,
         worldWidth: 40,
         worldHeight: 25,
         enemySpawnZ: -200,
@@ -1804,6 +1807,24 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     function updateBullets(dt) {
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
+            // Homing: gentle tracking toward nearest enemy in front of bullet
+            if (homingTimer > 0 && enemies.length > 0) {
+                let nearest = null, nearDist = Infinity;
+                for (const e of enemies) {
+                    if (!e.alive) continue;
+                    const ep = e.mesh.position;
+                    if (ep.z >= b.mesh.position.z) continue; // only target enemies ahead
+                    const ddx = ep.x - b.mesh.position.x, ddy = ep.y - b.mesh.position.y, ddz = ep.z - b.mesh.position.z;
+                    const d = ddx*ddx + ddy*ddy + ddz*ddz;
+                    if (d < nearDist) { nearDist = d; nearest = e; }
+                }
+                if (nearest) {
+                    const ep = nearest.mesh.position;
+                    b.vx += (ep.x - b.mesh.position.x) * 2 * dt;
+                    if (b.vy === undefined) b.vy = 0;
+                    b.vy += (ep.y - b.mesh.position.y) * 2 * dt;
+                }
+            }
             b.mesh.position.x += b.vx * dt;
             b.mesh.position.y += (b.vy || 0) * dt;
             b.mesh.position.z += b.vz * dt;
@@ -1817,47 +1838,141 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
     // ── Enemy Bullets ─────────────────────────────────────
     let enemyBullets = [];
-    const eBulletGeo = new THREE.SphereGeometry(0.35, 8, 8);
-    const eBulletMat = new THREE.MeshBasicMaterial({ color: 0xff1144, transparent: true, opacity: 1.0 });
-    const eBulletGlow = new THREE.SphereGeometry(1.0, 8, 8);
-    const eBulletGlowMat = new THREE.MeshBasicMaterial({
-        color: 0xff0033, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending,
-    });
 
-    function spawnEnemyBullet(x, y, z, tx, ty, tz, speed) {
+    function spawnEnemyBullet(x, y, z, tx, ty, tz, speed, sourceType) {
         const group = new THREE.Group();
-        const core = new THREE.Mesh(eBulletGeo, eBulletMat.clone());
-        const glow = new THREE.Mesh(eBulletGlow, eBulletGlowMat.clone());
-        group.add(core); group.add(glow);
-        // Trail sprite — comet tail using engine exhaust texture tinted hot magenta
-        const trail = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: exhaustTexture, color: 0xff1155,
-            blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7,
-            depthWrite: false,
-        }));
-        trail.scale.set(1.6, 1.6, 1);
-        group.add(trail);
+        let core, glow, trail;
+        const dx = tx - x, dy = ty - y, dz = tz - z;
+        const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        const vx = (dx/len) * speed, vy = (dy/len) * speed, vz = (dz/len) * speed;
+
+        if (sourceType === 'spreadsheetGoblin') {
+            // Green spinning rectangular data cells
+            core = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 0.35, 0.12),
+                new THREE.MeshBasicMaterial({ color: 0x44dd44, transparent: true, opacity: 1.0 })
+            );
+            glow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.8, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0x22ff22, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
+            );
+            trail = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: exhaustTexture, color: 0x44ff44,
+                blending: THREE.AdditiveBlending, transparent: true, opacity: 0.6, depthWrite: false,
+            }));
+            trail.scale.set(1.2, 1.2, 1);
+        } else if (sourceType === 'captainUtility') {
+            // Blue elongated tracer rounds
+            core = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8),
+                new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 1.0 })
+            );
+            // Orient cylinder along velocity
+            const velDir = new THREE.Vector3(vx, vy, vz).normalize();
+            const up = new THREE.Vector3(0, 1, 0);
+            const quat = new THREE.Quaternion().setFromUnitVectors(up, velDir);
+            core.quaternion.copy(quat);
+            glow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.7, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
+            );
+            trail = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: exhaustTexture, color: 0x4488ff,
+                blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7, depthWrite: false,
+            }));
+            trail.scale.set(2.0, 2.0, 1);
+        } else if (sourceType === 'permitKraken') {
+            // Red ink globs
+            core = new THREE.Mesh(
+                new THREE.SphereGeometry(0.4, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 1.0 })
+            );
+            glow = new THREE.Mesh(
+                new THREE.SphereGeometry(1.0, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xff6622, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
+            );
+            trail = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: exhaustTexture, color: 0xff4422,
+                blending: THREE.AdditiveBlending, transparent: true, opacity: 0.5, depthWrite: false,
+            }));
+            trail.scale.set(1.0, 1.0, 1);
+        } else if (sourceType === 'unknownUnknown') {
+            // Purple energy rings
+            core = new THREE.Mesh(
+                new THREE.TorusGeometry(0.5, 0.12, 8, 12),
+                new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 1.0 })
+            );
+            glow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.9, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
+            );
+            trail = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: exhaustTexture, color: 0xaa33ff,
+                blending: THREE.AdditiveBlending, transparent: true, opacity: 0.6, depthWrite: false,
+            }));
+            trail.scale.set(1.4, 1.4, 1);
+        } else {
+            // Default (regular enemies): hot magenta spheres, slightly smaller
+            core = new THREE.Mesh(
+                new THREE.SphereGeometry(0.28, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xff1144, transparent: true, opacity: 1.0 })
+            );
+            glow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.85, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending })
+            );
+            trail = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: exhaustTexture, color: 0xff1155,
+                blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7, depthWrite: false,
+            }));
+            trail.scale.set(1.6, 1.6, 1);
+        }
+
+        group.add(core); group.add(glow); group.add(trail);
         group.position.set(x, y, z);
         scene.add(group);
 
-        const dx = tx - x, dy = ty - y, dz = tz - z;
-        const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
         enemyBullets.push({
             mesh: group, core, glow, trail,
-            vx: (dx/len) * speed, vy: (dy/len) * speed, vz: (dz/len) * speed,
+            vx, vy, vz,
             dead: false, age: 0,
+            sourceType: sourceType || 'regular',
         });
     }
 
-    function updateEnemyBullets(dt) {
+    function updateEnemyBullets(rawDt) {
+        const dt = timeSlowTimer > 0 ? rawDt * 0.5 : rawDt; // enemy bullets slow when timeSlow active
         for (let i = enemyBullets.length - 1; i >= 0; i--) {
             const b = enemyBullets[i];
             b.age += dt;
             b.mesh.position.x += b.vx * dt;
             b.mesh.position.y += b.vy * dt;
             b.mesh.position.z += b.vz * dt;
-            // Spin the bullet group
-            b.mesh.rotation.z += dt * 8;
+
+            // Per-type animation
+            if (b.sourceType === 'spreadsheetGoblin') {
+                // Spin on Y axis
+                b.mesh.rotation.y += dt * 8;
+            } else if (b.sourceType === 'captainUtility') {
+                // Orient cylinder along velocity vector
+                if (b.core) {
+                    const velDir = _v3.set(b.vx, b.vy, b.vz).normalize();
+                    const up = new THREE.Vector3(0, 1, 0);
+                    b.core.quaternion.setFromUnitVectors(up, velDir);
+                }
+            } else if (b.sourceType === 'permitKraken') {
+                // Wobble scale
+                const wobble = 1 + Math.sin(b.age * 8) * 0.15;
+                b.mesh.scale.set(wobble, wobble, 1);
+            } else if (b.sourceType === 'unknownUnknown') {
+                // Spin the torus ring
+                b.mesh.rotation.x += dt * 6;
+                b.mesh.rotation.z += dt * 3;
+            } else {
+                // Default spin
+                b.mesh.rotation.z += dt * 8;
+            }
+
             // Pulse the core scale
             const pulse = 1.0 + Math.sin(b.age * 15) * 0.2;
             if (b.core) b.core.scale.setScalar(pulse);
@@ -2366,7 +2481,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         });
     }
 
-    function updateEnemies(dt) {
+    function updateEnemies(rawDt) {
+        const dt = timeSlowTimer > 0 ? rawDt * 0.5 : rawDt; // enemies slow when timeSlow active
         for (let i = enemies.length - 1; i >= 0; i--) {
             const e = enemies[i];
             e.age += dt;
@@ -2397,38 +2513,39 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                     // Helper: fire boss-specific bullet pattern
                     function fireBossPattern(e, p) {
                         const tx = player.x, ty = player.y, tz = CFG.playerZ;
+                        const st = e.type; // sourceType for projectile visuals
                         if (e.type === 'unknownUnknown') {
                             const speed = 22;
                             const pattern = Math.floor(e.bossTimer * 0.8) % 3;
                             if (pattern === 0) {
-                                for (let a = -2; a <= 2; a++) spawnEnemyBullet(p.x, p.y, p.z, tx + a * 5, ty, tz, speed);
+                                for (let a = -2; a <= 2; a++) spawnEnemyBullet(p.x, p.y, p.z, tx + a * 5, ty, tz, speed, st);
                             } else if (pattern === 1) {
-                                for (let a = 0; a < 4; a++) { const spread = (a - 1.5) * 6; spawnEnemyBullet(p.x, p.y, p.z, tx + spread, ty, tz, speed * 0.9); }
+                                for (let a = 0; a < 4; a++) { const spread = (a - 1.5) * 6; spawnEnemyBullet(p.x, p.y, p.z, tx + spread, ty, tz, speed * 0.9, st); }
                             } else {
-                                spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed);
-                                spawnEnemyBullet(p.x, p.y, p.z, tx - 3, ty + 2, tz, speed * 0.8);
-                                spawnEnemyBullet(p.x, p.y, p.z, tx + 3, ty + 2, tz, speed * 0.8);
+                                spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed, st);
+                                spawnEnemyBullet(p.x, p.y, p.z, tx - 3, ty + 2, tz, speed * 0.8, st);
+                                spawnEnemyBullet(p.x, p.y, p.z, tx + 3, ty + 2, tz, speed * 0.8, st);
                             }
                         } else if (e.type === 'permitKraken') {
                             // Kraken: 6-shot ring spread — tentacle spray
                             const speed = 20;
                             for (let a = -3; a <= 3; a++) {
-                                spawnEnemyBullet(p.x, p.y, p.z, tx + a * 4, ty + Math.abs(a) * 1.5, tz, speed * rand(0.85, 1.1));
+                                spawnEnemyBullet(p.x, p.y, p.z, tx + a * 4, ty + Math.abs(a) * 1.5, tz, speed * rand(0.85, 1.1), st);
                             }
                         } else if (e.type === 'captainUtility') {
                             // Captain: Tight aimed triple + side flankers
                             const speed = 24;
-                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed);           // dead center fast
-                            spawnEnemyBullet(p.x, p.y, p.z, tx - 1, ty + 0.5, tz, speed); // tight spread
-                            spawnEnemyBullet(p.x, p.y, p.z, tx + 1, ty + 0.5, tz, speed);
-                            spawnEnemyBullet(p.x, p.y, p.z, tx - 8, ty, tz, speed * 0.65); // wide flankers
-                            spawnEnemyBullet(p.x, p.y, p.z, tx + 8, ty, tz, speed * 0.65);
+                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed, st);           // dead center fast
+                            spawnEnemyBullet(p.x, p.y, p.z, tx - 1, ty + 0.5, tz, speed, st); // tight spread
+                            spawnEnemyBullet(p.x, p.y, p.z, tx + 1, ty + 0.5, tz, speed, st);
+                            spawnEnemyBullet(p.x, p.y, p.z, tx - 8, ty, tz, speed * 0.65, st); // wide flankers
+                            spawnEnemyBullet(p.x, p.y, p.z, tx + 8, ty, tz, speed * 0.65, st);
                         } else {
                             // Spreadsheet Goblin — center shot + spread so stationary player WILL get hit
                             const speed = 18;
-                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed);        // dead center
-                            spawnEnemyBullet(p.x, p.y, p.z, tx - 3, ty, tz, speed);
-                            spawnEnemyBullet(p.x, p.y, p.z, tx + 3, ty, tz, speed);
+                            spawnEnemyBullet(p.x, p.y, p.z, tx, ty, tz, speed, st);        // dead center
+                            spawnEnemyBullet(p.x, p.y, p.z, tx - 3, ty, tz, speed, st);
+                            spawnEnemyBullet(p.x, p.y, p.z, tx + 3, ty, tz, speed, st);
                         }
                     }
 
@@ -2581,7 +2698,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 e.shootTimer -= dt;
                 if (e.shootTimer <= 0) {
                     e.shootTimer = e.shootRate * rand(0.8, 1.3);
-                    spawnEnemyBullet(p.x, p.y, p.z, player.x, player.y, CFG.playerZ, 20 + e.speed * 0.3);
+                    spawnEnemyBullet(p.x, p.y, p.z, player.x, player.y, CFG.playerZ, 20 + e.speed * 0.3, 'regular');
                 }
             }
 
@@ -2673,7 +2790,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 p.mesh.position.x += p.vx * dt;
                 p.mesh.position.y += p.vy * dt;
                 p.mesh.position.z += p.vz * dt;
-                p.mesh.scale.multiplyScalar(0.96);
+                if (p.isFragment) {
+                    // Tumbling fragments with gravity
+                    p.vy -= 12 * dt; // gravity
+                    p.mesh.rotation.x += (p.rotVx || 0) * dt;
+                    p.mesh.rotation.y += (p.rotVy || 0) * dt;
+                    p.mesh.rotation.z += (p.rotVz || 0) * dt;
+                }
+                p.mesh.scale.multiplyScalar(p.isFragment ? 0.99 : 0.96);
             }
 
             if (p.life <= 0) {
@@ -2689,20 +2813,28 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     //  POWER-UPS
     // ════════════════════════════════════════════════════════════
     let powerUps = [];
-    const PU_TYPES = ['spread','shield','score2x','gisStrike'];
+    const PU_TYPES = ['spread','shield','score2x','gisStrike','rapidFire','homing','timeSlow'];
     const GIS_GOLD = 0xffa500;
     const GIS_GOLD_S = '#ffa500';
-    const PU_COLORS_HEX = { spread: BLUE, shield: GREEN, score2x: YELLOW, gisStrike: GIS_GOLD };
-    const PU_LABELS = { spread:'SPREAD SHOT', shield:'SHIELD ×3', score2x:'2× SCORE', gisStrike:'GIS STRIKE' };
-    const PU_CSS = { spread: BLUE_S, shield: GREEN_S, score2x: YELLOW_S, gisStrike: GIS_GOLD_S };
+    const PU_COLORS_HEX = { spread: BLUE, shield: GREEN, score2x: YELLOW, gisStrike: GIS_GOLD, rapidFire: 0xff6600, homing: 0xff00ff, timeSlow: 0x00ffff };
+    const PU_LABELS = { spread:'SPREAD SHOT', shield:'SHIELD ×3', score2x:'2× SCORE', gisStrike:'GIS STRIKE', rapidFire:'RAPID FIRE', homing:'HOMING', timeSlow:'TIME SLOW' };
+    const PU_CSS = { spread: BLUE_S, shield: GREEN_S, score2x: YELLOW_S, gisStrike: GIS_GOLD_S, rapidFire:'#ff6600', homing:'#ff00ff', timeSlow:'#00ffff' };
 
     function spawnPowerUp(x, y, z) {
         const type = PU_TYPES[randInt(0, PU_TYPES.length-1)];
         const color = PU_COLORS_HEX[type];
-        const geo = new THREE.OctahedronGeometry(0.6, 0);
-        const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8 });
-        const mesh = new THREE.Mesh(geo, mat);
 
+        // Holographic crystal core
+        const coreGeo = new THREE.IcosahedronGeometry(0.5, 0);
+        const coreMat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8 });
+        const mesh = new THREE.Mesh(coreGeo, coreMat);
+
+        // Wireframe overlay
+        const wireGeo = new THREE.IcosahedronGeometry(0.7, 0);
+        const wireMat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.3 });
+        mesh.add(new THREE.Mesh(wireGeo, wireMat));
+
+        // Glow sphere
         const glowGeo = new THREE.SphereGeometry(1.4, 8, 8);
         const glowMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending });
         mesh.add(new THREE.Mesh(glowGeo, glowMat));
@@ -2710,9 +2842,25 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const light = new THREE.PointLight(color, 1.5, 12);
         mesh.add(light);
 
+        // Orbiting particle dots
+        const orbitParticles = [];
+        const particleCount = 4 + Math.floor(Math.random() * 3); // 4-6 particles
+        for (let i = 0; i < particleCount; i++) {
+            const pGeo = new THREE.SphereGeometry(0.08, 4, 4);
+            const pMat = new THREE.MeshBasicMaterial({ color, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.8 });
+            const particle = new THREE.Mesh(pGeo, pMat);
+            const orbitAngle = (i / particleCount) * Math.PI * 2;
+            const orbitRadius = rand(0.9, 1.3);
+            const orbitSpeed = rand(2.0, 4.5) * (Math.random() > 0.5 ? 1 : -1);
+            const orbitTilt = rand(-0.5, 0.5);
+            particle.position.set(Math.cos(orbitAngle) * orbitRadius, Math.sin(orbitAngle) * orbitRadius * 0.5 + orbitTilt, 0);
+            mesh.add(particle);
+            orbitParticles.push({ mesh: particle, angle: orbitAngle, radius: orbitRadius, speed: orbitSpeed, tilt: orbitTilt });
+        }
+
         mesh.position.set(x, y, z);
         scene.add(mesh);
-        powerUps.push({ mesh, type, age: 0, alive: true });
+        powerUps.push({ mesh, type, age: 0, alive: true, orbitParticles });
     }
 
     function updatePowerUps(dt) {
@@ -2734,6 +2882,17 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             // Pulsing glow
             const pulseScale = 1 + Math.sin(p.age * 6) * 0.15;
             p.mesh.scale.set(pulseScale, pulseScale, pulseScale);
+            // Animate orbiting particles
+            if (p.orbitParticles) {
+                for (const op of p.orbitParticles) {
+                    op.angle += op.speed * dt;
+                    op.mesh.position.set(
+                        Math.cos(op.angle) * op.radius,
+                        Math.sin(op.angle * 0.7) * op.tilt * op.radius + Math.sin(op.angle) * op.radius * 0.3,
+                        Math.sin(op.angle) * op.radius * 0.5
+                    );
+                }
+            }
             if (pp.z > 20 || !p.alive) {
                 scene.remove(p.mesh); powerUps.splice(i, 1);
             }
@@ -2760,6 +2919,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 const hitR = ETYPES[e.type].scale * 1.5;
                 if (dx*dx + dy*dy + dz*dz < hitR*hitR + 1) {
                     b.dead = true; shotsHit++;
+                    // Bullet impact sparks — 4 tiny golden sparks
+                    for (let s = 0; s < 4; s++) {
+                        spawnExplosion(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 0xffcc44, 1, 8, 0.1);
+                    }
                     e.hp--; e.flashTimer = 0.08;
                     if (e.healthBar) { updateEnemyHealthBar(e.healthBar, e.hp, e.maxHp, e.color); updateEnemyHealthBarVisibility(e); }
                     const ep = e.mesh.position;
@@ -2821,21 +2984,90 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const pts = e.pts * (scoreMultTimer > 0 ? 2 : 1);
         score += pts;
         const isBoss = e.behavior === 'boss';
+        const et = ETYPES[e.type];
         const ep = e.mesh.position;
         const colors = [e.color, YELLOW, RED, WHITE, BLUE];
-        const n = isBoss ? 60 : 18;
-        for (let j = 0; j < n; j++) {
-            spawnExplosion(ep.x, ep.y, ep.z, colors[j%5], 1, isBoss?25:12, isBoss?0.7:0.35);
-        }
-        // Shockwave ring on kill
-        spawnShockwave(ep.x, ep.y, ep.z, e.color);
+
         if (isBoss) {
+            // Boss death: 60 particles + 3 delayed secondary explosions + 3 shockwaves at different delays
+            for (let j = 0; j < 60; j++) {
+                spawnExplosion(ep.x, ep.y, ep.z, colors[j%5], 1, 25, 0.7);
+            }
+            spawnShockwave(ep.x, ep.y, ep.z, e.color);
             spawnShockwave(ep.x, ep.y, ep.z, YELLOW);
             spawnShockwave(ep.x, ep.y, ep.z, WHITE);
+            // Delayed secondary explosions
+            const bx = ep.x, by = ep.y, bz = ep.z, bc = e.color;
+            setTimeout(() => {
+                spawnExplosion(bx + rand(-2,2), by + rand(-1,1), bz + rand(-2,2), bc, 20, 18, 0.5);
+                spawnShockwave(bx + rand(-1,1), by, bz + rand(-1,1), YELLOW);
+            }, 200);
+            setTimeout(() => {
+                spawnExplosion(bx + rand(-3,3), by + rand(-2,2), bz + rand(-3,3), 0xffaa00, 25, 20, 0.6);
+                spawnShockwave(bx + rand(-2,2), by, bz + rand(-2,2), RED);
+            }, 500);
+            setTimeout(() => {
+                spawnExplosion(bx + rand(-2,2), by + rand(-1,1), bz + rand(-1,1), WHITE, 15, 15, 0.4);
+                spawnShockwave(bx, by, bz, WHITE);
+            }, 800);
+        } else if (et.scale >= 1.2) {
+            // Medium enemy: fragment effect — spawn 3-5 tumbling box fragments + 18 particles + white flash
+            for (let j = 0; j < 18; j++) {
+                spawnExplosion(ep.x, ep.y, ep.z, colors[j%5], 1, 12, 0.35);
+            }
+            // White flash particles
+            spawnExplosion(ep.x, ep.y, ep.z, 0xffffff, 5, 10, 0.2);
+            // Fragment meshes
+            const fragCount = 3 + Math.floor(Math.random() * 3); // 3-5
+            for (let f = 0; f < fragCount; f++) {
+                const fSize = rand(0.3, 0.7) * et.scale;
+                const fGeo = new THREE.BoxGeometry(fSize, fSize * rand(0.5, 1.5), fSize * rand(0.3, 0.8));
+                const fMat = new THREE.MeshBasicMaterial({
+                    color: e.color, transparent: true, opacity: 1.0,
+                    blending: THREE.AdditiveBlending,
+                });
+                const fMesh = new THREE.Mesh(fGeo, fMat);
+                fMesh.position.set(ep.x + rand(-0.5,0.5), ep.y + rand(-0.5,0.5), ep.z + rand(-0.5,0.5));
+                scene.add(fMesh);
+                const angle = rand(0, Math.PI * 2);
+                const elev = rand(-Math.PI/3, Math.PI/3);
+                const spd = rand(8, 18);
+                explosionParticles.push({
+                    mesh: fMesh,
+                    vx: Math.cos(angle) * Math.cos(elev) * spd,
+                    vy: Math.sin(elev) * spd + rand(2, 6),
+                    vz: Math.sin(angle) * Math.cos(elev) * spd,
+                    life: rand(0.6, 1.2), maxLife: 1.2,
+                    isRing: false, isFragment: true,
+                    rotVx: rand(-8, 8), rotVy: rand(-8, 8), rotVz: rand(-8, 8),
+                });
+            }
+        } else {
+            // Small enemy: quick pop — 18 particles + white flash
+            for (let j = 0; j < 18; j++) {
+                spawnExplosion(ep.x, ep.y, ep.z, colors[j%5], 1, 12, 0.35);
+            }
+            // White flash
+            spawnExplosion(ep.x, ep.y, ep.z, 0xffffff, 3, 8, 0.15);
         }
+
+        // Shockwave ring on all kills
+        spawnShockwave(ep.x, ep.y, ep.z, e.color);
+
         shakeIntensity = Math.max(shakeIntensity, isBoss ? 1.2 : 0.25);
         if (e.splits) { for (let s = 0; s < 2; s++) spawnEnemy('badData'); }
         if (Math.random() < (isBoss ? 1 : 0.08)) spawnPowerUp(ep.x, ep.y, ep.z);
+
+        // Screen flash tint for medium+ enemies and bosses
+        if (isBoss || et.scale >= 1.2) {
+            const flash = document.getElementById('damage-flash');
+            const c = e.color;
+            const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+            flash.style.background = `radial-gradient(ellipse at center, rgba(${r},${g},${b},0.15) 0%, transparent 70%)`;
+            flash.classList.add('active');
+            setTimeout(() => { flash.classList.remove('active'); flash.style.background = ''; }, 150);
+        }
+
         // Score pop animation — mega-pop for bosses or high combos
         const scoreEl = document.getElementById('score-display');
         scoreEl.classList.remove('pop', 'mega-pop'); void scoreEl.offsetWidth;
@@ -2930,7 +3162,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 const gisPickup = document.getElementById('gis-icon-wrap');
                 if (gisPickup) { gisPickup.classList.remove('charge-pickup'); void gisPickup.offsetWidth; gisPickup.classList.add('charge-pickup'); setTimeout(() => gisPickup.classList.remove('charge-pickup'), 600); }
                 break;
+            case 'rapidFire': rapidFireTimer = CFG.rapidFireDuration; break;
+            case 'homing': homingTimer = CFG.homingDuration; break;
+            case 'timeSlow': timeSlowTimer = CFG.timeSlowDuration; break;
         }
+        // Slowmo pop effect on any power-up pickup
+        timeScale = 0.3;
+        setTimeout(() => { timeScale = 1.0; }, 200);
         updateHUD();
     }
 
@@ -2987,6 +3225,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     let waveIndex = 0, displayWave = 0, enemiesSpawned = 0, enemiesInWave = 0, waveKills = 0;
     let spawnTimer = 0, waveTimer = 0, wavePhase = 'announce';
     let fireTimer = 0, invulnTimer = 0, spreadTimer = 0, scoreMultTimer = 0, shieldHP = 0;
+    let rapidFireTimer = 0, homingTimer = 0, timeSlowTimer = 0;
     let shakeIntensity = 0;
     let reticleHitTimer = 0; // sustained hit glow timer
     let totalKills = 0, shotsFired = 0, shotsHit = 0;
@@ -2999,6 +3238,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     let lastLifeLostTime = 0; // timestamp for pip explosion
     let comboCount = 0, comboTimer = 0;
     const COMBO_WINDOW = 2.0;
+    let timeScale = 1.0;
 
     // ── High Scores ─────────────────────────────────────
     let highScores = [];
@@ -3233,6 +3473,18 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         if (shieldHP > 0) {
             powerHtml += `<div class="pw-item" style="color:${GREEN_S}"><div class="pw-label">SHIELD x${shieldHP}</div></div>`;
         }
+        if (rapidFireTimer > 0) {
+            const pct = (rapidFireTimer/CFG.rapidFireDuration)*100;
+            powerHtml += `<div class="pw-item" style="color:#ff6600"><div class="pw-label">RAPID FIRE</div><div class="pw-bar"><div class="pw-fill" style="width:${pct}%;background:#ff6600"></div></div></div>`;
+        }
+        if (homingTimer > 0) {
+            const pct = (homingTimer/CFG.homingDuration)*100;
+            powerHtml += `<div class="pw-item" style="color:#ff00ff"><div class="pw-label">HOMING</div><div class="pw-bar"><div class="pw-fill" style="width:${pct}%;background:#ff00ff"></div></div></div>`;
+        }
+        if (timeSlowTimer > 0) {
+            const pct = (timeSlowTimer/CFG.timeSlowDuration)*100;
+            powerHtml += `<div class="pw-item" style="color:#00ffff"><div class="pw-label">TIME SLOW</div><div class="pw-bar"><div class="pw-fill" style="width:${pct}%;background:#00ffff"></div></div></div>`;
+        }
         document.getElementById('power-display').innerHTML = powerHtml;
 
         // Shield visual mesh
@@ -3328,6 +3580,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         displayScore = 0; comboCount = 0; comboTimer = 0; lastLifeLostTime = 0;
         waveIndex = 0; displayWave = 0;
         fireTimer = 0; invulnTimer = 0; spreadTimer = 0; scoreMultTimer = 0; shieldHP = 0;
+        rapidFireTimer = 0; homingTimer = 0; timeSlowTimer = 0; timeScale = 1.0;
         shakeIntensity = 0; totalKills = 0; shotsFired = 0; shotsHit = 0;
         callsignSubmitted = false;
         player.x = 0; player.y = 2; player.vx = 0; player.vy = 0; player.bankAngle = 0; player.pitchAngle = 0;
@@ -3680,6 +3933,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
     function update(dt) {
         dt = Math.min(dt, 0.05);
+        dt *= timeScale;
 
         updateStars(dt);
         updateGround(dt);
@@ -3788,10 +4042,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
             if (spreadTimer > 0) spreadTimer -= dt;
             if (scoreMultTimer > 0) scoreMultTimer -= dt;
+            if (rapidFireTimer > 0) rapidFireTimer -= dt;
+            if (homingTimer > 0) homingTimer -= dt;
+            if (timeSlowTimer > 0) timeSlowTimer -= dt;
 
             fireTimer -= dt;
             if (fireTimer <= 0) {
-                fireTimer = CFG.fireRate;
+                fireTimer = rapidFireTimer > 0 ? CFG.fireRate * 0.4 : CFG.fireRate;
                 // Wing-tip lasers — tight parallel streams, minimal perspective convergence
                 if (spreadTimer > 0) {
                     spawnBullet(player.x - 1.4, player.y, 0);
@@ -3897,6 +4154,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         displayScore = 0; comboCount = 0; comboTimer = 0; lastLifeLostTime = 0;
         waveIndex = idx; displayWave = idx;
         fireTimer = 0; invulnTimer = 0; spreadTimer = 0; scoreMultTimer = 0; shieldHP = 0;
+        rapidFireTimer = 0; homingTimer = 0; timeSlowTimer = 0; timeScale = 1.0;
         shakeIntensity = 0; totalKills = 0; shotsFired = 0; shotsHit = 0;
         callsignSubmitted = false;
         player.x = 0; player.y = 2; player.vx = 0; player.vy = 0; player.bankAngle = 0; player.pitchAngle = 0;
