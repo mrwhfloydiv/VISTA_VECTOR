@@ -2862,6 +2862,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     //  GAME STATE
     // ════════════════════════════════════════════════════════════
     let gameState = 'VIDEO_INTRO';
+
+    // ── Soundtrack ──────────────────────────────────────────
+    const soundtrack = new Audio('SOUNDS/VISTA_VECTOR_SOUNDTRACK.MP3');
+    soundtrack.loop = true;
+    soundtrack.volume = 0.4;
+
     let score = 0, lives = 1, currentHP = 3, specialCharges = 1;
     let waveIndex = 0, displayWave = 0, enemiesSpawned = 0, enemiesInWave = 0, waveKills = 0;
     let spawnTimer = 0, waveTimer = 0, wavePhase = 'announce';
@@ -3537,6 +3543,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             introEl.style.display = 'none';
             gameState = 'TITLE';
             document.getElementById('title-screen').style.display = 'flex';
+            // Start soundtrack on title screen — loops through gameplay
+            soundtrack.currentTime = 0;
+            soundtrack.play().catch(() => {}); // catch if autoplay blocked
         }, 400);
     }
 
