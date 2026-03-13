@@ -1331,6 +1331,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     // ── Three.js Setup — Camera higher/further for Star Fox chase cam ──
     const scene = new THREE.Scene();
     const _v3 = new THREE.Vector3(); // reusable scratch vector
+    const _projV = new THREE.Vector3();
+    // Dynamic convergence — bullets auto-focus on nearest enemy under crosshair
+    const CONVERGE_DIST_MAX = 120;
+    const CONVERGE_DIST_MIN = 10;
+    const CONVERGE_SNAP_RADIUS = 100; // pixels
+    let currentConvergeDist = CONVERGE_DIST_MAX;
     scene.background = new THREE.Color(BG);
     scene.fog = new THREE.FogExp2(BG, 0.006);
 
@@ -1885,24 +1891,42 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         blending: THREE.AdditiveBlending,
     });
 
-    // Star Fox-style aiming: bullets fire from wings, aimed PARALLEL toward reticle direction
-    // All bullets share the same aim vector (from ship center to reticle) so they never cross
+    // Bullet aiming via camera unprojection — converges at dynamic depth
+    const _bulletNear = new THREE.Vector3();
+    const _bulletFar = new THREE.Vector3();
+    const _bulletDir = new THREE.Vector3();
+
     function spawnBullet(x, y, spreadOffsetX) {
+        // Unproject mouse NDC into a world-space ray through the camera
+        _bulletNear.set(input.ndcX, input.ndcY, 0).unproject(camera);
+        _bulletFar.set(input.ndcX, input.ndcY, 1).unproject(camera);
+        _bulletDir.copy(_bulletFar).sub(_bulletNear).normalize();
+
+        // Intersect ray with the convergence Z plane to get aim point
+        const convergeZ = CFG.playerZ - currentConvergeDist;
+        const t = (convergeZ - _bulletNear.z) / _bulletDir.z;
+        const targetX = _bulletNear.x + _bulletDir.x * t;
+        const targetY = _bulletNear.y + _bulletDir.y * t;
+
+        // Shared aim direction from ship center — both wing bullets fly parallel
+        const dx = targetX - player.x;
+        const dy = targetY - player.y;
+        const dz = convergeZ - CFG.playerZ;
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        const spawnZ = CFG.playerZ - 2;
         const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
-        mesh.position.set(x, y, CFG.playerZ - 2);
+        mesh.position.set(x, y, spawnZ);
         mesh.rotation.x = Math.PI / 2;
         const glow = new THREE.Mesh(bulletGlowGeo, bulletGlowMat.clone());
         mesh.add(glow);
         scene.add(mesh);
-        const speed = CFG.bulletSpeed;
-        // Bullets fire straight forward — parallel wing lasers that NEVER cross
-        // Slight lateral tracking toward reticle X offset for aiming feel
-        const aimX = (reticle.x - player.x) * 0.08; // very subtle lateral drift
+
         bullets.push({
             mesh,
-            vx: (spreadOffsetX || 0) + aimX,
-            vy: 0,
-            vz: -speed,
+            vx: (dx / len) * CFG.bulletSpeed,
+            vy: (dy / len) * CFG.bulletSpeed,
+            vz: (dz / len) * CFG.bulletSpeed,
         });
         shotsFired++;
     }
@@ -1944,20 +1968,16 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
     function spawnEnemyBullet(x, y, z, tx, ty, tz, speed, sourceType) {
         const group = new THREE.Group();
-        let core, glow, trail;
+        let core, trail;
         const dx = tx - x, dy = ty - y, dz = tz - z;
         const len = Math.sqrt(dx*dx + dy*dy + dz*dz);
         const vx = (dx/len) * speed, vy = (dy/len) * speed, vz = (dz/len) * speed;
 
         if (sourceType === 'spreadsheetGoblin') {
-            // Green spinning rectangular data cells
+            // Green spinning rectangular data cells — no glow, clean pulse
             core = new THREE.Mesh(
                 new THREE.BoxGeometry(0.5, 0.35, 0.12),
                 new THREE.MeshBasicMaterial({ color: 0x44dd44, transparent: true, opacity: 1.0 })
-            );
-            glow = new THREE.Mesh(
-                new THREE.SphereGeometry(0.8, 8, 8),
-                new THREE.MeshBasicMaterial({ color: 0x22ff22, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
             );
             trail = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: exhaustTexture, color: 0x44ff44,
@@ -1965,7 +1985,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             }));
             trail.scale.set(1.2, 1.2, 1);
         } else if (sourceType === 'captainUtility') {
-            // Blue elongated tracer rounds
+            // Blue elongated tracer rounds — no glow, clean pulse
             core = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8),
                 new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 1.0 })
@@ -1975,24 +1995,16 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             const up = new THREE.Vector3(0, 1, 0);
             const quat = new THREE.Quaternion().setFromUnitVectors(up, velDir);
             core.quaternion.copy(quat);
-            glow = new THREE.Mesh(
-                new THREE.SphereGeometry(0.7, 8, 8),
-                new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
-            );
             trail = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: exhaustTexture, color: 0x4488ff,
                 blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7, depthWrite: false,
             }));
             trail.scale.set(2.0, 2.0, 1);
         } else if (sourceType === 'permitKraken') {
-            // Red ink globs
+            // Red ink globs — no glow, clean pulse
             core = new THREE.Mesh(
                 new THREE.SphereGeometry(0.4, 8, 8),
                 new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 1.0 })
-            );
-            glow = new THREE.Mesh(
-                new THREE.SphereGeometry(1.0, 8, 8),
-                new THREE.MeshBasicMaterial({ color: 0xff6622, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
             );
             trail = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: exhaustTexture, color: 0xff4422,
@@ -2000,14 +2012,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             }));
             trail.scale.set(1.0, 1.0, 1);
         } else if (sourceType === 'unknownUnknown') {
-            // Purple energy rings
+            // Purple energy rings — no glow, clean scale pulse
             core = new THREE.Mesh(
                 new THREE.TorusGeometry(0.5, 0.12, 8, 12),
                 new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 1.0 })
-            );
-            glow = new THREE.Mesh(
-                new THREE.SphereGeometry(0.9, 8, 8),
-                new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending })
             );
             trail = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: exhaustTexture, color: 0xaa33ff,
@@ -2015,14 +2023,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             }));
             trail.scale.set(1.4, 1.4, 1);
         } else {
-            // Default (regular enemies): hot magenta spheres, slightly smaller
+            // Default (regular enemies): hot magenta spheres — no glow, clean pulse
             core = new THREE.Mesh(
                 new THREE.SphereGeometry(0.28, 8, 8),
                 new THREE.MeshBasicMaterial({ color: 0xff1144, transparent: true, opacity: 1.0 })
-            );
-            glow = new THREE.Mesh(
-                new THREE.SphereGeometry(0.85, 8, 8),
-                new THREE.MeshBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending })
             );
             trail = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: exhaustTexture, color: 0xff1155,
@@ -2031,12 +2035,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             trail.scale.set(1.6, 1.6, 1);
         }
 
-        group.add(core); group.add(glow); group.add(trail);
+        group.add(core); group.add(trail);
         group.position.set(x, y, z);
         scene.add(group);
 
         enemyBullets.push({
-            mesh: group, core, glow, trail,
+            mesh: group, core, trail,
             vx, vy, vz,
             dead: false, age: 0,
             sourceType: sourceType || 'regular',
@@ -2052,49 +2056,39 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             b.mesh.position.y += b.vy * dt;
             b.mesh.position.z += b.vz * dt;
 
-            // Per-type animation
+            // Per-type animation — clean scale pulses, no glow spheres
+            const t = b.age;
             if (b.sourceType === 'spreadsheetGoblin') {
-                // Spin on Y axis
+                // Spin on Y axis + clean scale pulse
                 b.mesh.rotation.y += dt * 8;
+                const pulse = 1.0 + Math.sin(t * 8) * 0.25;
+                if (b.core) b.core.scale.setScalar(pulse);
             } else if (b.sourceType === 'captainUtility') {
-                // Orient cylinder along velocity vector
+                // Orient cylinder along velocity + length pulse
                 if (b.core) {
                     const velDir = _v3.set(b.vx, b.vy, b.vz).normalize();
                     const up = new THREE.Vector3(0, 1, 0);
                     b.core.quaternion.setFromUnitVectors(up, velDir);
+                    const pulse = 1.0 + Math.sin(t * 12) * 0.2;
+                    b.core.scale.set(pulse, 1, pulse);
                 }
             } else if (b.sourceType === 'permitKraken') {
-                // Wobble scale
-                const wobble = 1 + Math.sin(b.age * 8) * 0.15;
-                b.mesh.scale.set(wobble, wobble, 1);
+                // Clean breathing scale pulse
+                const pulse = 1.0 + Math.sin(t * 6) * 0.3;
+                if (b.core) b.core.scale.setScalar(pulse);
             } else if (b.sourceType === 'unknownUnknown') {
-                // Spin the torus ring
+                // Spin the torus ring + clean scale pulse
                 b.mesh.rotation.x += dt * 6;
                 b.mesh.rotation.z += dt * 3;
-            } else {
-                // Regular enemy orbs — aggressive breathing pulse like website orbs
-                b.mesh.rotation.z += dt * 5;
-                const t = b.age;
-                // Core: rhythmic scale pulse (breathe in/out)
-                const coreScale = 1.0 + Math.sin(t * 10) * 0.4 + Math.sin(t * 17) * 0.15;
-                if (b.core) b.core.scale.setScalar(coreScale);
-                // Core: opacity flickers
-                if (b.core) b.core.material.opacity = 0.7 + Math.sin(t * 12) * 0.3;
-                // Glow: inverse pulse — expands when core shrinks
-                const glowScale = 1.0 + Math.sin(t * 10 + Math.PI) * 0.3;
-                if (b.glow) {
-                    b.glow.scale.setScalar(glowScale);
-                    b.glow.material.opacity = 0.15 + Math.sin(t * 8) * 0.2;
-                }
-            }
-
-            // Pulse the core scale (non-regular types)
-            if (b.sourceType !== 'regular') {
-                const pulse = 1.0 + Math.sin(b.age * 15) * 0.2;
+                const pulse = 1.0 + Math.sin(t * 7) * 0.35;
                 if (b.core) b.core.scale.setScalar(pulse);
+            } else {
+                // Regular enemy orbs — clean breathing scale pulse
+                b.mesh.rotation.z += dt * 5;
+                const pulse = 1.0 + Math.sin(t * 8) * 0.4 + Math.sin(t * 13) * 0.15;
+                if (b.core) b.core.scale.setScalar(pulse);
+                if (b.core) b.core.material.opacity = 0.8 + Math.sin(t * 10) * 0.2;
             }
-            // Pulse the glow opacity (non-regular types)
-            if (b.sourceType !== 'regular' && b.glow) b.glow.material.opacity = 0.2 + Math.sin(b.age * 12) * 0.12;
             // Trail follows behind the bullet (opposite of velocity direction)
             if (b.trail) {
                 const trailScale = 0.8 + Math.sin(b.age * 10) * 0.3;
@@ -4120,6 +4114,30 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             // Clamp ship to bounds
             player.x = clamp(player.x, -shipMaxX, shipMaxX);
             player.y = clamp(player.y, CFG.groundY + 3, CFG.shipBoundsYHigh);
+
+            // ── DYNAMIC CONVERGENCE — bullets auto-focus on enemy under crosshair ──
+            let targetConvergeDist = CONVERGE_DIST_MAX;
+            let closestScreenDist = Infinity;
+            const cursorPxX = input.x;
+            const cursorPxY = input.y;
+            const winW = window.innerWidth;
+            const winH = window.innerHeight;
+            for (let ei = 0; ei < enemies.length; ei++) {
+                const e = enemies[ei];
+                if (!e.alive) continue;
+                const ep = e.mesh.position;
+                _projV.set(ep.x, ep.y, ep.z).project(camera);
+                const sx = (_projV.x * 0.5 + 0.5) * winW;
+                const sy = (-_projV.y * 0.5 + 0.5) * winH;
+                const dx = sx - cursorPxX;
+                const dy = sy - cursorPxY;
+                const screenDist = Math.sqrt(dx * dx + dy * dy);
+                if (screenDist < CONVERGE_SNAP_RADIUS && screenDist < closestScreenDist) {
+                    closestScreenDist = screenDist;
+                    targetConvergeDist = clamp(CFG.playerZ - ep.z, CONVERGE_DIST_MIN, CONVERGE_DIST_MAX);
+                }
+            }
+            currentConvergeDist += (targetConvergeDist - currentConvergeDist) * clamp(5 * dt, 0, 1);
 
             // ── STEP 3: BANKING & BODY LANGUAGE ──
             // Bank is derived from OFFSET between reticle and ship (not velocity)
