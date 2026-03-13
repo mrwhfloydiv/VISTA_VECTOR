@@ -2779,6 +2779,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 // === DEATH SEQUENCE: Big explosion, hide ship, delay, then game over ===
                 gameState = 'DYING';
                 playerMesh.visible = false;
+                deathSound.currentTime = 0;
+                deathSound.play().catch(() => {});
                 // Massive multi-stage explosion
                 spawnExplosion(player.x, player.y, CFG.playerZ, 0xff4444, 50, 25, 0.8);
                 spawnShockwave(player.x, player.y, CFG.playerZ, 0xff2200);
@@ -2863,10 +2865,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     // ════════════════════════════════════════════════════════════
     let gameState = 'VIDEO_INTRO';
 
-    // ── Soundtrack ──────────────────────────────────────────
+    // ── Soundtrack & SFX ─────────────────────────────────────
     const soundtrack = new Audio('SOUNDS/VISTA_VECTOR_SOUNDTRACK.MP3');
     soundtrack.loop = true;
     soundtrack.volume = 0.4;
+    const deathSound = new Audio('SOUNDS/deathsound_r2d2-scream7.mp3');
+    deathSound.volume = 0.7;
 
     let score = 0, lives = 1, currentHP = 3, specialCharges = 1;
     let waveIndex = 0, displayWave = 0, enemiesSpawned = 0, enemiesInWave = 0, waveKills = 0;
