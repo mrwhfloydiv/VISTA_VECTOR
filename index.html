@@ -579,28 +579,58 @@
         }
         #damage-flash.active { opacity: 1; transition: opacity 0s; }
 
-        /* GAME OVER flash text — appears during death explosion before report card */
+        /* GAME OVER flash text — appears during death explosion, click to dismiss */
         #gameover-flash {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            display: none; align-items: center; justify-content: center;
-            z-index: 19; pointer-events: none;
-            background: rgba(0,0,0,0.5);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 19; pointer-events: auto; cursor: pointer;
+            background: rgba(0,0,0,0.0);
+        }
+        #gameover-flash.active {
+            animation: goFlashBgIn 1.2s ease-out forwards;
+        }
+        @keyframes goFlashBgIn {
+            0% { background: rgba(0,0,0,0.0); }
+            100% { background: rgba(0,0,0,0.7); }
         }
         #gameover-flash .go-flash-text {
             font-family: 'Space Grotesk', sans-serif;
-            font-size: clamp(52px, 14vw, 110px); font-weight: 700;
-            color: #b22c2e; letter-spacing: 10px;
-            text-shadow: 0 0 60px rgba(178,44,46,0.9), 0 0 120px rgba(178,44,46,0.5),
-                         0 0 200px rgba(178,44,46,0.3);
+            font-size: clamp(60px, 16vw, 130px); font-weight: 700;
+            color: #cc2222; letter-spacing: 12px;
+            text-shadow: 0 0 80px rgba(200,30,30,1.0), 0 0 160px rgba(200,30,30,0.6),
+                         0 0 240px rgba(200,30,30,0.3), 0 4px 20px rgba(0,0,0,0.8);
+            opacity: 0;
         }
         #gameover-flash.active .go-flash-text {
-            animation: goFlashIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation: goFlashIn 0.8s cubic-bezier(0.22, 1.2, 0.36, 1) forwards;
         }
         @keyframes goFlashIn {
-            0% { opacity: 0; transform: scale(4); filter: brightness(6) blur(10px); }
-            40% { opacity: 1; filter: brightness(2.5) blur(0); }
-            70% { transform: scale(0.95); }
-            100% { opacity: 1; transform: scale(1); filter: brightness(1); }
+            0% { opacity: 0; transform: scale(6) rotate(-3deg); filter: brightness(8) blur(12px); }
+            30% { opacity: 1; transform: scale(0.85) rotate(1deg); filter: brightness(3) blur(0); }
+            60% { transform: scale(1.08) rotate(-0.5deg); filter: brightness(1.5); }
+            80% { transform: scale(0.98) rotate(0deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); filter: brightness(1); }
+        }
+        #gameover-flash .go-flash-sub {
+            font-family: 'IBM Plex Mono', monospace; font-size: 14px;
+            color: rgba(255,255,255,0.0); letter-spacing: 6px;
+            margin-top: 30px;
+        }
+        #gameover-flash.active .go-flash-sub {
+            animation: goFlashSubIn 0.5s ease-out 1.5s forwards;
+        }
+        @keyframes goFlashSubIn {
+            0% { color: rgba(255,255,255,0.0); }
+            100% { color: rgba(255,255,255,0.4); }
+        }
+        /* Pulsing glow on the text while waiting for click */
+        #gameover-flash.active .go-flash-text {
+            animation: goFlashIn 0.8s cubic-bezier(0.22, 1.2, 0.36, 1) forwards,
+                       goFlashPulse 2s ease-in-out 1.5s infinite;
+        }
+        @keyframes goFlashPulse {
+            0%, 100% { text-shadow: 0 0 80px rgba(200,30,30,1.0), 0 0 160px rgba(200,30,30,0.6), 0 0 240px rgba(200,30,30,0.3), 0 4px 20px rgba(0,0,0,0.8); }
+            50% { text-shadow: 0 0 120px rgba(200,30,30,1.0), 0 0 200px rgba(200,30,30,0.8), 0 0 300px rgba(200,30,30,0.5), 0 4px 20px rgba(0,0,0,0.8); }
         }
 
         /* ═══════════════════════════════════════════════════
@@ -1093,7 +1123,7 @@
     <!-- Damage Flash -->
     <div class="hud-announce-dim" id="announce-dim"></div>
     <div id="damage-flash"></div>
-    <div id="gameover-flash"><div class="go-flash-text">GAME OVER</div></div>
+    <div id="gameover-flash"><div class="go-flash-text">GAME OVER</div><div class="go-flash-sub">CLICK TO CONTINUE</div></div>
 
     <!-- Dev Mode Panel -->
     <div id="dev-panel">
@@ -2971,7 +3001,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 const dz = b.mesh.position.z - CFG.playerZ;
                 if (dx*dx + dy*dy + dz*dz < playerR*playerR + 0.5) {
                     b.dead = true;
-                    hitPlayer();
+                    hitPlayer(b.sourceType);
                     break;
                 }
             }
@@ -3101,7 +3131,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         updateHUD();
     }
 
-    function hitPlayer() {
+    function hitPlayer(sourceType) {
         if (devMode.godMode) { invulnTimer = 0.2; return; } // God mode — no damage
         // Shield absorbs hit first
         if (shieldHP > 0) {
@@ -3115,12 +3145,29 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         currentHP--;
         invulnTimer = CFG.invulnTime;
         shakeIntensity = Math.max(shakeIntensity, 0.8);
-        spawnExplosion(player.x, player.y, CFG.playerZ, RED, 30, 18, 0.5);
-        spawnShockwave(player.x, player.y, CFG.playerZ, RED);
-        // Damage flash vignette
+        // Source-specific hit colors and effects
+        const hitColors = {
+            spreadsheetGoblin: 0x44dd44,
+            captainUtility: 0x4488ff,
+            permitKraken: 0xff3333,
+            unknownUnknown: 0xbb44ff,
+        };
+        const hitColor = hitColors[sourceType] || RED;
+        spawnExplosion(player.x, player.y, CFG.playerZ, hitColor, 30, 18, 0.5);
+        spawnShockwave(player.x, player.y, CFG.playerZ, hitColor);
+        // Extra ring burst for Unknown Unknown hits — unmistakable purple flash
+        if (sourceType === 'unknownUnknown') {
+            spawnShockwave(player.x, player.y, CFG.playerZ, 0xff66ff);
+            spawnExplosion(player.x, player.y, CFG.playerZ, 0xff66ff, 15, 12, 0.3);
+            shakeIntensity = Math.max(shakeIntensity, 1.2);
+        }
+        // Damage flash vignette — tinted to source color
         const flash = document.getElementById('damage-flash');
+        const hc = hitColor;
+        const hr = (hc >> 16) & 255, hg = (hc >> 8) & 255, hb = hc & 255;
+        flash.style.background = `radial-gradient(ellipse at center, transparent 25%, rgba(${hr},${hg},${hb},0.55) 100%)`;
         flash.classList.add('active');
-        setTimeout(() => flash.classList.remove('active'), 180);
+        setTimeout(() => { flash.classList.remove('active'); flash.style.background = ''; }, 200);
         // Health bar hit reaction (shake + flash)
         const healthContainer = document.querySelector('.health-bar-container');
         const healthFillEl = document.getElementById('health-fill');
@@ -3151,13 +3198,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 spawnExplosion(player.x, player.y, CFG.playerZ, 0xff4444, 50, 25, 0.8);
                 spawnShockwave(player.x, player.y, CFG.playerZ, 0xff2200);
                 shakeIntensity = 2.0;
-                // Show "GAME OVER" flash text immediately
-                const goFlash = document.getElementById('gameover-flash');
-                goFlash.classList.remove('active');
-                goFlash.style.display = 'flex';
-                // Force reflow then trigger animation via class
-                void goFlash.offsetWidth;
-                goFlash.classList.add('active');
                 // Secondary explosions after short delays
                 setTimeout(() => {
                     spawnExplosion(player.x + 2, player.y + 1, CFG.playerZ - 1, 0xffaa00, 30, 20, 0.5);
@@ -3168,12 +3208,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                     spawnExplosion(player.x - 1, player.y - 1, CFG.playerZ + 1, 0xffcc33, 25, 15, 0.4);
                     shakeIntensity = Math.max(shakeIntensity, 1.0);
                 }, 600);
-                // Hide GAME OVER flash and show report card after explosion settles
+                // Show "GAME OVER" flash after explosion — stays until clicked
                 setTimeout(() => {
+                    const goFlash = document.getElementById('gameover-flash');
                     goFlash.classList.remove('active');
-                    goFlash.style.display = 'none';
-                    gameOver();
-                }, 2500);
+                    goFlash.style.display = 'flex';
+                    void goFlash.offsetWidth;
+                    goFlash.classList.add('active');
+                }, 1200);
                 return;
             }
             // If somehow more lives (shouldn't happen with maxLives=1)
@@ -3737,6 +3779,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         list.innerHTML = html;
     }
     document.getElementById('retry-msg').addEventListener('click', startGame);
+    // GAME OVER flash — click to dismiss and show report card
+    document.getElementById('gameover-flash').addEventListener('click', () => {
+        if (gameState !== 'DYING' && gameState !== 'GAMEOVER') return;
+        const goFlash = document.getElementById('gameover-flash');
+        goFlash.classList.remove('active');
+        goFlash.style.display = 'none';
+        gameOver();
+    });
     document.getElementById('title-screen').addEventListener('click', () => {
         if (gameState === 'TITLE') startGame();
     });
@@ -4003,9 +4053,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 reticle.rawX = clamp(input.ndcX * sens, -CFG.reticleBoundsX, CFG.reticleBoundsX);
                 reticle.rawY = clamp(input.ndcY * sens, -CFG.reticleBoundsY, CFG.reticleBoundsY);
             } else {
-                // Return to center when mouse leaves
-                reticle.rawX = smoothStep(reticle.rawX, 0, 0.20, CFG.reticleReturnSpeed * dt, 0.001);
-                reticle.rawY = smoothStep(reticle.rawY, 0, 0.20, CFG.reticleReturnSpeed * dt, 0.001);
+                // Mouse off-screen: hold last position (don't snap back to center)
+                // Ship and reticle stay where they were
             }
 
             // Reticle moves FAST — near-instant response, wider range than ship
