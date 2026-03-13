@@ -3938,10 +3938,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         updateStars(dt);
         updateGround(dt);
         updateSpaceDust(dt);
-        // Engine trail + speed lines only when ship is visible
+        // Engine trail always updates (so particles fade out on death)
+        updateEngineTrail(dt);
+        // Only spawn NEW particles + speed lines when ship is visible
         if (!playerMesh || playerMesh.visible) {
             updateSpeedLines(dt);
-            updateEngineTrail(dt);
             for (let _s = 0; _s < 3; _s++) { if (Math.random() < 0.8) spawnEngineParticle(); }
         }
         updateExplosions(dt);
