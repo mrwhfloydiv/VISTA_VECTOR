@@ -579,6 +579,28 @@
         }
         #damage-flash.active { opacity: 1; transition: opacity 0s; }
 
+        /* GAME OVER flash text — appears during death explosion before report card */
+        #gameover-flash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; align-items: center; justify-content: center;
+            z-index: 15; pointer-events: none;
+            background: rgba(0,0,0,0.4);
+        }
+        #gameover-flash .go-flash-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(48px, 12vw, 96px); font-weight: 700;
+            color: #b22c2e; letter-spacing: 8px;
+            text-shadow: 0 0 40px rgba(178,44,46,0.8), 0 0 80px rgba(178,44,46,0.4),
+                         0 0 120px rgba(178,44,46,0.2);
+            opacity: 0;
+            animation: goFlashIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
+        }
+        @keyframes goFlashIn {
+            0% { opacity: 0; transform: scale(3); filter: brightness(5) blur(8px); }
+            50% { opacity: 1; transform: scale(0.95); filter: brightness(2) blur(0); }
+            100% { opacity: 1; transform: scale(1); filter: brightness(1); }
+        }
+
         /* ═══════════════════════════════════════════════════
            TITLE SCREEN
            ═══════════════════════════════════════════════════ */
@@ -1069,6 +1091,7 @@
     <!-- Damage Flash -->
     <div class="hud-announce-dim" id="announce-dim"></div>
     <div id="damage-flash"></div>
+    <div id="gameover-flash"><div class="go-flash-text">GAME OVER</div></div>
 
     <!-- Dev Mode Panel -->
     <div id="dev-panel">
@@ -3126,6 +3149,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 spawnExplosion(player.x, player.y, CFG.playerZ, 0xff4444, 50, 25, 0.8);
                 spawnShockwave(player.x, player.y, CFG.playerZ, 0xff2200);
                 shakeIntensity = 2.0;
+                // Show "GAME OVER" flash text immediately
+                const goFlash = document.getElementById('gameover-flash');
+                goFlash.style.display = 'flex';
+                // Reset animation
+                const goFlashText = goFlash.querySelector('.go-flash-text');
+                goFlashText.style.animation = 'none'; void goFlashText.offsetWidth; goFlashText.style.animation = '';
                 // Secondary explosions after short delays
                 setTimeout(() => {
                     spawnExplosion(player.x + 2, player.y + 1, CFG.playerZ - 1, 0xffaa00, 30, 20, 0.5);
@@ -3136,8 +3165,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                     spawnExplosion(player.x - 1, player.y - 1, CFG.playerZ + 1, 0xffcc33, 25, 15, 0.4);
                     shakeIntensity = Math.max(shakeIntensity, 1.0);
                 }, 600);
-                // Show game over after explosion settles (2 seconds)
-                setTimeout(() => gameOver(), 2000);
+                // Hide GAME OVER flash and show report card after explosion settles
+                setTimeout(() => {
+                    goFlash.style.display = 'none';
+                    gameOver();
+                }, 2500);
                 return;
             }
             // If somehow more lives (shouldn't happen with maxLives=1)
@@ -3557,6 +3589,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     function startGame() {
         document.getElementById('title-screen').style.display = 'none';
         document.getElementById('gameover-screen').style.display = 'none';
+        document.getElementById('gameover-flash').style.display = 'none';
         document.getElementById('hud').style.display = 'block';
 
         // Camera transition from orbit to gameplay
@@ -4074,6 +4107,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             checkCollisions();
             updateWaves(dt);
             updateHUD();
+        } else if (gameState === 'DYING') {
+            // Keep bullets/enemies moving during death sequence
+            updateBullets(dt);
+            updateEnemyBullets(dt);
+            updateEnemies(dt);
         } else {
             specialTrigger = false;
         }
