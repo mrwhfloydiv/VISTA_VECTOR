@@ -2912,9 +2912,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     const PU_COLORS_HEX = { spread: BLUE, shield: GREEN, score2x: YELLOW, gisStrike: GIS_GOLD, rapidFire: 0xff6600, homing: 0xff00ff, timeSlow: 0x00ffff };
     const PU_LABELS = { spread:'SPREAD SHOT', shield:'SHIELD ×3', score2x:'2× SCORE', gisStrike:'GIS STRIKE', rapidFire:'RAPID FIRE', homing:'HOMING', timeSlow:'TIME SLOW' };
     const PU_CSS = { spread: BLUE_S, shield: GREEN_S, score2x: YELLOW_S, gisStrike: GIS_GOLD_S, rapidFire:'#ff6600', homing:'#ff00ff', timeSlow:'#00ffff' };
+    let lastPowerUpType = '';
 
     function spawnPowerUp(x, y, z) {
-        const type = PU_TYPES[randInt(0, PU_TYPES.length-1)];
+        // No duplicate drops — pick a different type than last time
+        let type;
+        do { type = PU_TYPES[randInt(0, PU_TYPES.length-1)]; } while (type === lastPowerUpType && PU_TYPES.length > 1);
+        lastPowerUpType = type;
         const color = PU_COLORS_HEX[type];
 
         // Holographic crystal core
