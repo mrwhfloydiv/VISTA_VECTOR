@@ -427,6 +427,24 @@
             100% { transform: scale(1.0); filter: brightness(1); }
         }
 
+        /* GIS double-click hint */
+        .gis-hint {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: clamp(6px, 0.7vw, 9px); color: rgba(255,165,0,0.0);
+            letter-spacing: 2px; margin-top: 6px; font-weight: 700;
+            text-align: center; white-space: nowrap;
+            text-shadow: 0 0 8px rgba(255,165,0,0.5);
+            transition: opacity 0.3s;
+        }
+        .gis-hint.visible {
+            color: rgba(255,165,0,0.9);
+            animation: gisHintPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes gisHintPulse {
+            0%, 100% { opacity: 0.5; text-shadow: 0 0 6px rgba(255,165,0,0.3); }
+            50% { opacity: 1.0; text-shadow: 0 0 14px rgba(255,165,0,0.7), 0 0 30px rgba(255,165,0,0.3); }
+        }
+
         /* GIS charge pickup flash */
         .gis-icon-wrap.charge-pickup { animation: gisChargePickup 0.6s ease-out !important; }
         @keyframes gisChargePickup {
@@ -652,118 +670,212 @@
            GAME OVER — Dramatic Assessment
            ═══════════════════════════════════════════════════ */
         #gameover-screen {
-            background: rgba(2,3,6,0.92); display: none;
-            backdrop-filter: blur(3px);
+            background: rgba(2,3,6,0.95); display: none;
+            backdrop-filter: blur(6px);
         }
+        /* Animated background particles for game over */
+        #gameover-screen::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background:
+                radial-gradient(ellipse at 30% 20%, rgba(178,44,46,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(235,170,31,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(181,217,238,0.04) 0%, transparent 60%);
+            animation: goAmbient 8s ease-in-out infinite alternate;
+            pointer-events: none;
+        }
+        @keyframes goAmbient {
+            0% { opacity: 0.5; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.05); }
+        }
+        /* Scan line sweep on game over */
+        #gameover-screen::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(180deg, transparent 0%, rgba(181,217,238,0.03) 50%, transparent 100%);
+            background-size: 100% 200%;
+            animation: goScanSweep 4s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes goScanSweep {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 200%; }
+        }
+
         .go-frame {
-            position: relative; padding: 40px 50px;
-            border: 1px solid rgba(181,217,238,0.08);
-            background: rgba(2,3,6,0.6);
-            max-width: 380px; width: 90%;
+            position: relative; padding: 35px 45px;
+            border: 1px solid rgba(181,217,238,0.12);
+            background: rgba(2,3,6,0.7);
+            max-width: 420px; width: 92%;
+            opacity: 0; animation: goFrameIn 0.6s ease-out 0.2s forwards;
+            box-shadow: 0 0 60px rgba(2,3,6,0.8), 0 0 120px rgba(181,217,238,0.03);
+        }
+        @keyframes goFrameIn {
+            0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+            60% { transform: scale(1.02) translateY(-2px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
         }
         .go-frame::before, .go-frame::after {
             content: ''; position: absolute;
-            background: rgba(181,217,238,0.15);
         }
-        .go-frame::before { top: -1px; left: 20%; width: 60%; height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.3), transparent); }
-        .go-frame::after { bottom: -1px; left: 20%; width: 60%; height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.3), transparent); }
+        .go-frame::before { top: -1px; left: 10%; width: 80%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(235,170,31,0.4), transparent);
+            animation: goLineGlow 3s ease-in-out infinite; }
+        .go-frame::after { bottom: -1px; left: 10%; width: 80%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.3), transparent);
+            animation: goLineGlow 3s ease-in-out infinite 1.5s; }
+        @keyframes goLineGlow {
+            0%, 100% { opacity: 0.5; } 50% { opacity: 1; }
+        }
 
-        .go-header { text-align: center; margin-bottom: 25px; }
+        .go-header { text-align: center; margin-bottom: 20px; }
         .go-header h2 {
-            font-family: 'Space Grotesk', sans-serif; font-size: 28px;
-            color: #b22c2e; font-weight: 700; letter-spacing: 3px;
-            text-shadow: 0 0 20px rgba(178,44,46,0.4);
+            font-family: 'Space Grotesk', sans-serif; font-size: 32px;
+            color: #b22c2e; font-weight: 700; letter-spacing: 4px;
+            text-shadow: 0 0 30px rgba(178,44,46,0.5), 0 0 60px rgba(178,44,46,0.2);
             position: relative;
+            opacity: 0; animation: goTitleIn 0.5s ease-out 0.4s forwards;
         }
-        /* Glitch effect */
+        @keyframes goTitleIn {
+            0% { opacity: 0; letter-spacing: 20px; filter: blur(8px); }
+            100% { opacity: 1; letter-spacing: 4px; filter: blur(0); }
+        }
+        /* Glitch effect — more aggressive */
         .go-header h2::before, .go-header h2::after {
             content: attr(data-text); position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
         }
         .go-header h2::before {
-            color: #b5d9ee; animation: glitch1 4s infinite;
+            color: #b5d9ee; animation: glitch1 2.5s infinite;
             clip-path: polygon(0 0, 100% 0, 100% 40%, 0 40%); left: -2px;
         }
         .go-header h2::after {
-            color: #ebaa1f; animation: glitch2 4s infinite;
+            color: #ebaa1f; animation: glitch2 2.5s infinite;
             clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%); left: 2px;
         }
         @keyframes glitch1 {
-            0%,88%,100% { transform: translate(0); opacity: 0; }
-            90% { transform: translate(-4px, 1px); opacity: 0.7; }
-            92% { transform: translate(3px, -1px); opacity: 0.7; }
-            94% { transform: translate(-2px, 0); opacity: 0; }
+            0%,85%,100% { transform: translate(0); opacity: 0; }
+            87% { transform: translate(-5px, 2px); opacity: 0.8; }
+            89% { transform: translate(4px, -1px); opacity: 0.8; }
+            91% { transform: translate(-3px, 0); opacity: 0; }
         }
         @keyframes glitch2 {
-            0%,88%,100% { transform: translate(0); opacity: 0; }
-            91% { transform: translate(3px, 1px); opacity: 0.6; }
-            93% { transform: translate(-4px, -1px); opacity: 0.6; }
-            95% { transform: translate(2px, 0); opacity: 0; }
+            0%,85%,100% { transform: translate(0); opacity: 0; }
+            88% { transform: translate(4px, 1px); opacity: 0.7; }
+            90% { transform: translate(-5px, -2px); opacity: 0.7; }
+            92% { transform: translate(3px, 0); opacity: 0; }
         }
         .go-sub {
             font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-            color: rgba(181,217,238,0.3); letter-spacing: 6px; margin-top: 4px;
+            color: rgba(181,217,238,0.4); letter-spacing: 6px; margin-top: 6px;
+            opacity: 0; animation: fadeInUp 0.4s ease-out 0.6s forwards;
+        }
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(8px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
         .go-line {
-            width: 100%; height: 1px; margin: 0 auto 20px;
-            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.15), transparent);
+            width: 100%; height: 1px; margin: 0 auto 16px;
+            background: linear-gradient(90deg, transparent, rgba(181,217,238,0.2), transparent);
+            animation: goLineExpand 0.6s ease-out 0.7s both;
+        }
+        @keyframes goLineExpand {
+            0% { width: 0%; opacity: 0; }
+            100% { width: 100%; opacity: 1; }
         }
 
-        /* Stats — Staggered animation */
+        /* Stats — Staggered slide-in with counting effect look */
         .stat-group {
             display: flex; justify-content: space-between; align-items: baseline;
-            padding: 8px 0; border-bottom: 1px solid rgba(181,217,238,0.04);
-            opacity: 0; animation: statSlide 0.4s ease-out forwards;
+            padding: 7px 0; border-bottom: 1px solid rgba(181,217,238,0.05);
+            opacity: 0; animation: statSlide 0.5s ease-out forwards;
         }
         @keyframes statSlide {
-            0% { opacity: 0; transform: translateX(-15px); }
-            100% { opacity: 1; transform: translateX(0); }
+            0% { opacity: 0; transform: translateX(-20px); filter: blur(4px); }
+            100% { opacity: 1; transform: translateX(0); filter: blur(0); }
         }
         .stat-label {
             font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-            color: rgba(255,255,255,0.3); letter-spacing: 1px;
+            color: rgba(255,255,255,0.35); letter-spacing: 1px;
         }
         .stat-value {
             font-family: 'IBM Plex Mono', monospace; font-size: 18px;
             color: #e8e8e8; font-weight: 700;
         }
-        .stat-value.gold { color: #ebaa1f; text-shadow: 0 0 10px rgba(235,170,31,0.3); }
+        .stat-value.gold { color: #ebaa1f; text-shadow: 0 0 12px rgba(235,170,31,0.4); }
 
-        /* Grade Display */
+        /* Grade Display — Epic slam with afterglow */
         .go-grade {
-            text-align: center; margin: 20px 0 8px;
+            text-align: center; margin: 16px 0 6px;
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 72px; font-weight: 700;
+            font-size: 80px; font-weight: 700;
             letter-spacing: 4px;
-            opacity: 0; animation: gradeSlam 0.4s ease-out forwards;
+            opacity: 0; animation: gradeSlam 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
         @keyframes gradeSlam {
-            0% { opacity: 0; transform: scale(2.5); filter: brightness(3); }
-            60% { transform: scale(0.95); }
-            100% { opacity: 1; transform: scale(1); filter: brightness(1); }
+            0% { opacity: 0; transform: scale(4) rotate(-5deg); filter: brightness(5) blur(6px); }
+            50% { transform: scale(0.9) rotate(1deg); filter: brightness(2) blur(0); }
+            70% { transform: scale(1.05) rotate(0deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); filter: brightness(1); }
         }
-        .go-grade.s { color: #ebaa1f; text-shadow: 0 0 30px rgba(235,170,31,0.5), 0 0 60px rgba(235,170,31,0.2); }
-        .go-grade.a { color: #7cc8a1; text-shadow: 0 0 25px rgba(124,200,161,0.4); }
-        .go-grade.b { color: #b5d9ee; text-shadow: 0 0 25px rgba(181,217,238,0.4); }
-        .go-grade.c { color: #e8e8e8; text-shadow: 0 0 20px rgba(232,232,232,0.3); }
+        .go-grade.s { color: #ebaa1f; text-shadow: 0 0 40px rgba(235,170,31,0.6), 0 0 80px rgba(235,170,31,0.3), 0 0 120px rgba(235,170,31,0.1); animation-duration: 0.8s; }
+        .go-grade.a { color: #7cc8a1; text-shadow: 0 0 30px rgba(124,200,161,0.5), 0 0 60px rgba(124,200,161,0.2); }
+        .go-grade.b { color: #b5d9ee; text-shadow: 0 0 30px rgba(181,217,238,0.5), 0 0 60px rgba(181,217,238,0.2); }
+        .go-grade.c { color: #e8e8e8; text-shadow: 0 0 25px rgba(232,232,232,0.3); }
         .go-grade.d { color: rgba(255,255,255,0.5); }
-        .go-grade.f { color: #b22c2e; text-shadow: 0 0 25px rgba(178,44,46,0.4); }
+        .go-grade.f { color: #b22c2e; text-shadow: 0 0 30px rgba(178,44,46,0.5), 0 0 60px rgba(178,44,46,0.2); }
+        /* S-grade special glow pulse */
+        .go-grade.s::after {
+            content: ''; position: absolute; top: 50%; left: 50%;
+            width: 200px; height: 200px; transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(235,170,31,0.15) 0%, transparent 70%);
+            animation: sGradeGlow 2s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes sGradeGlow {
+            0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.8); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        }
 
         .go-status {
-            text-align: center; margin-top: 8px;
+            text-align: center; margin-top: 6px;
             font-family: 'Space Grotesk', sans-serif;
             font-size: 22px; font-weight: 700; letter-spacing: 3px;
+            opacity: 0; animation: statusFlash 0.5s ease-out forwards;
         }
-        .go-status.cleared { color: #7cc8a1; text-shadow: 0 0 15px rgba(124,200,161,0.4); }
-        .go-status.failed { color: #b22c2e; text-shadow: 0 0 15px rgba(178,44,46,0.4); }
+        @keyframes statusFlash {
+            0% { opacity: 0; filter: brightness(3); }
+            100% { opacity: 1; filter: brightness(1); }
+        }
+        .go-status.cleared { color: #7cc8a1; text-shadow: 0 0 20px rgba(124,200,161,0.5); }
+        .go-status.failed { color: #b22c2e; text-shadow: 0 0 20px rgba(178,44,46,0.5); }
+
+        /* ── High Score Leaderboard ── */
+        .go-leaderboard {
+            margin-top: 16px; padding-top: 12px;
+            border-top: 1px solid rgba(181,217,238,0.08);
+            opacity: 0; animation: fadeInUp 0.5s ease-out forwards;
+        }
+        .go-leaderboard-title {
+            font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+            color: rgba(235,170,31,0.5); letter-spacing: 4px; text-align: center;
+            margin-bottom: 8px;
+        }
+        .go-lb-row {
+            display: flex; justify-content: space-between; align-items: baseline;
+            padding: 3px 0; font-family: 'IBM Plex Mono', monospace;
+        }
+        .go-lb-rank { font-size: 9px; color: rgba(181,217,238,0.3); width: 24px; }
+        .go-lb-name { font-size: 11px; color: rgba(181,217,238,0.6); letter-spacing: 2px; flex: 1; }
+        .go-lb-score { font-size: 12px; color: rgba(235,170,31,0.7); font-weight: 700; }
+        .go-lb-row.current { background: rgba(235,170,31,0.05); border-radius: 2px; padding: 3px 4px; }
+        .go-lb-row.current .go-lb-name { color: #ebaa1f; }
+        .go-lb-row.current .go-lb-score { color: #ebaa1f; text-shadow: 0 0 8px rgba(235,170,31,0.3); }
+        .go-lb-row:first-child .go-lb-score { color: #ebaa1f; }
 
         /* Callsign */
-        #callsign-wrap { margin-top: 20px; text-align: center; }
+        #callsign-wrap { margin-top: 16px; text-align: center; }
         .callsign-label {
             font-family: 'IBM Plex Mono', monospace; font-size: 9px;
-            color: rgba(181,217,238,0.3); letter-spacing: 3px; margin-bottom: 6px;
+            color: rgba(181,217,238,0.4); letter-spacing: 3px; margin-bottom: 6px;
         }
         #callsign-input {
             width: 80px; height: 44px;
@@ -771,10 +883,10 @@
             color: #b5d9ee; font-family: 'IBM Plex Mono', monospace;
             font-size: 24px; text-align: center; text-transform: uppercase;
             letter-spacing: 8px; outline: none; caret-color: #ebaa1f;
-            transition: border-color 0.2s;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
-        #callsign-input:focus { border-color: rgba(181,217,238,0.6);
-            box-shadow: 0 0 15px rgba(181,217,238,0.1); }
+        #callsign-input:focus { border-color: rgba(235,170,31,0.6);
+            box-shadow: 0 0 20px rgba(235,170,31,0.15), 0 0 40px rgba(235,170,31,0.05); }
         #callsign-btn {
             display: block; margin: 10px auto 0; padding: 6px 24px;
             background: transparent; border: 1px solid rgba(124,200,161,0.4);
@@ -783,12 +895,16 @@
             transition: all 0.2s;
         }
         #callsign-btn:hover { background: rgba(124,200,161,0.1);
-            box-shadow: 0 0 15px rgba(124,200,161,0.15); }
+            box-shadow: 0 0 20px rgba(124,200,161,0.2); transform: scale(1.05); }
         .retry-msg {
             font-family: 'Manrope', sans-serif; font-size: 16px;
-            color: rgba(255,255,255,0.6); margin-top: 25px; display: none;
-            animation: pulse 2s ease-in-out infinite; cursor: pointer;
-            text-align: center;
+            color: rgba(255,255,255,0.6); margin-top: 20px; display: none;
+            animation: retryPulse 2s ease-in-out infinite; cursor: pointer;
+            text-align: center; letter-spacing: 2px;
+        }
+        @keyframes retryPulse {
+            0%, 100% { opacity: 0.5; text-shadow: none; }
+            50% { opacity: 1; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
         }
         /* ═══════════════════════════════════════════════════
            DEV MODE — Wave Selector Panel
@@ -943,6 +1059,7 @@
             </div>
             <div class="gis-count" id="gis-count">x1</div>
             <div class="gis-label">GIS STRIKE</div>
+            <div class="gis-hint" id="gis-hint">DOUBLE-CLICK TO USE</div>
         </div>
 
         <div class="hud-power" id="power-display"></div>
@@ -1012,6 +1129,10 @@
                 <input type="text" id="callsign-input" maxlength="2" placeholder="__" autocomplete="off" autocapitalize="characters" spellcheck="false">
                 <button id="callsign-btn">SUBMIT</button>
             </div>
+            <div class="go-leaderboard" id="go-leaderboard" style="display:none">
+                <div class="go-leaderboard-title">HIGH SCORES</div>
+                <div id="go-lb-list"></div>
+            </div>
             <div class="retry-msg" id="retry-msg">CLICK TO RETRY</div>
         </div>
     </div>
@@ -1053,9 +1174,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     const CFG = {
         fireRate: 0.13,
         bulletSpeed: 80,
-        playerEase: 8,
+        playerEase: 14,
         invulnTime: 1.8,
-        maxLives: 3,
+        maxLives: 1,
         hitsPerLife: 3,
         maxSpecials: 3,
         spreadDuration: 12,
@@ -1157,28 +1278,29 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         }
 
         // ── Full surrounding grid (visible during camera orbit from all angles) ──
-        // Z-axis lines (parallel, extending far behind and to sides)
-        const gridExtent = 400;  // how far the grid reaches in +Z (behind ship)
-        const gridWidth = 400;   // how wide the grid is (X axis)
-        const gridSpacing = 8;   // spacing between grid lines
-        for (let x = -gridWidth; x <= gridWidth; x += gridSpacing) {
-            const distFromCenter = Math.abs(x) / gridWidth;
-            const opacity = 0.16 * (1 - distFromCenter * 0.7);
+        // Converging Z-axis lines behind ship — mirrors the forward grid density
+        const gridExtent = 400;
+        for (let i = -80; i <= 80; i++) {
+            const x = i * 4;
+            const distFromCenter = Math.abs(i) / 80;
+            const opacity = 0.18 * (1 - distFromCenter * 0.4);
             if (opacity < 0.01) continue;
             const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity, depthWrite: false });
-            const pts = [new THREE.Vector3(x, CFG.groundY, 10), new THREE.Vector3(x, CFG.groundY, gridExtent)];
+            const pts = [new THREE.Vector3(x, CFG.groundY, 10), new THREE.Vector3(x * 0.2, CFG.groundY, gridExtent)];
             const geo = new THREE.BufferGeometry().setFromPoints(pts);
             const colors = new Float32Array([
                 blueCol.r, blueCol.g, blueCol.b,
-                blueCol.r * 0.02, blueCol.g * 0.02, blueCol.b * 0.02,
+                blueCol.r * 0.03, blueCol.g * 0.03, blueCol.b * 0.03,
             ]);
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
             groundGroup.add(new THREE.Line(geo, mat));
         }
-        // X-axis lines (horizontal, behind ship)
-        for (let z = 10; z <= gridExtent; z += gridSpacing) {
+        // X-axis lines (horizontal, behind ship) — matching forward grid density
+        const gridWidth = 400;
+        const rearHSpacing = 10; // ~matching scrolling line spacing
+        for (let z = 10; z <= gridExtent; z += rearHSpacing) {
             const distNorm = (z - 10) / (gridExtent - 10);
-            const opacity = 0.16 * (1 - distNorm * 0.85);
+            const opacity = 0.18 * (1 - distNorm * 0.9);
             if (opacity < 0.01) continue;
             const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity, depthWrite: false });
             const pts = [
@@ -1633,11 +1755,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
     // ── Enemy Bullets ─────────────────────────────────────
     let enemyBullets = [];
-    const eBulletGeo = new THREE.SphereGeometry(0.3, 8, 8);
-    const eBulletMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.95 });
-    const eBulletGlow = new THREE.SphereGeometry(0.8, 8, 8);
+    const eBulletGeo = new THREE.SphereGeometry(0.35, 8, 8);
+    const eBulletMat = new THREE.MeshBasicMaterial({ color: 0xff1144, transparent: true, opacity: 1.0 });
+    const eBulletGlow = new THREE.SphereGeometry(1.0, 8, 8);
     const eBulletGlowMat = new THREE.MeshBasicMaterial({
-        color: RED, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending,
+        color: 0xff0033, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending,
     });
 
     function spawnEnemyBullet(x, y, z, tx, ty, tz, speed) {
@@ -1645,13 +1767,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const core = new THREE.Mesh(eBulletGeo, eBulletMat.clone());
         const glow = new THREE.Mesh(eBulletGlow, eBulletGlowMat.clone());
         group.add(core); group.add(glow);
-        // Trail sprite — comet tail using engine exhaust texture tinted red
+        // Trail sprite — comet tail using engine exhaust texture tinted hot magenta
         const trail = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: exhaustTexture, color: 0xff3322,
-            blending: THREE.AdditiveBlending, transparent: true, opacity: 0.5,
+            map: exhaustTexture, color: 0xff1155,
+            blending: THREE.AdditiveBlending, transparent: true, opacity: 0.7,
             depthWrite: false,
         }));
-        trail.scale.set(1.2, 1.2, 1);
+        trail.scale.set(1.6, 1.6, 1);
         group.add(trail);
         group.position.set(x, y, z);
         scene.add(group);
@@ -2109,8 +2231,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const isBoss = et.behavior === 'boss';
 
         const mesh = createEnemyMesh(typeName, et);
-        const startX = isBoss ? 0 : rand(-CFG.worldWidth * 0.4, CFG.worldWidth * 0.4);
-        const startY = isBoss ? 2 : rand(0, 8);
+        const startX = isBoss ? 0 : rand(-CFG.worldWidth * 0.3, CFG.worldWidth * 0.3);
+        const startY = isBoss ? 2 : rand(1, 6);
         mesh.position.set(startX, startY, CFG.enemySpawnZ);
         scene.add(mesh);
 
@@ -2142,7 +2264,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
                 case 'zigzag':
                     p.z += e.speed * dt;
                     p.x += Math.sin(e.age * 2.5) * 15 * dt;
-                    p.x = clamp(p.x, -CFG.worldWidth*0.45, CFG.worldWidth*0.45);
+                    p.x = clamp(p.x, -CFG.worldWidth*0.3, CFG.worldWidth*0.3);
                     break;
                 case 'stealth':
                     p.z += e.speed * dt;
@@ -2354,9 +2476,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     // ════════════════════════════════════════════════════════════
     let powerUps = [];
     const PU_TYPES = ['spread','shield','score2x','gisStrike'];
-    const PU_COLORS_HEX = { spread: BLUE, shield: GREEN, score2x: YELLOW, gisStrike: RED };
+    const GIS_GOLD = 0xffa500;
+    const GIS_GOLD_S = '#ffa500';
+    const PU_COLORS_HEX = { spread: BLUE, shield: GREEN, score2x: YELLOW, gisStrike: GIS_GOLD };
     const PU_LABELS = { spread:'SPREAD SHOT', shield:'SHIELD ×3', score2x:'2× SCORE', gisStrike:'GIS STRIKE' };
-    const PU_CSS = { spread: BLUE_S, shield: GREEN_S, score2x: YELLOW_S, gisStrike: RED_S };
+    const PU_CSS = { spread: BLUE_S, shield: GREEN_S, score2x: YELLOW_S, gisStrike: GIS_GOLD_S };
 
     function spawnPowerUp(x, y, z) {
         const type = PU_TYPES[randInt(0, PU_TYPES.length-1)];
@@ -2540,13 +2664,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         if (currentHP <= 0) {
             lives--;
             if (lives <= 0) { gameOver(); return; }
-            // Dramatic life loss — flash bar white, track for pip explosion
+            // If somehow more lives (shouldn't happen with maxLives=1)
             lastLifeLostTime = performance.now();
-            if (healthFillEl) {
-                healthFillEl.classList.remove('life-lost-flash'); void healthFillEl.offsetWidth;
-                healthFillEl.classList.add('life-lost-flash');
-                setTimeout(() => healthFillEl.classList.remove('life-lost-flash'), 600);
-            }
             currentHP = CFG.hitsPerLife;
             invulnTimer = 2.5;
             shakeIntensity = Math.max(shakeIntensity, 1.2);
@@ -2610,7 +2729,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     //  GAME STATE
     // ════════════════════════════════════════════════════════════
     let gameState = 'VIDEO_INTRO';
-    let score = 0, lives = 3, currentHP = 3, specialCharges = 1;
+    let score = 0, lives = 1, currentHP = 3, specialCharges = 1;
     let waveIndex = 0, displayWave = 0, enemiesSpawned = 0, enemiesInWave = 0, waveKills = 0;
     let spawnTimer = 0, waveTimer = 0, wavePhase = 'announce';
     let fireTimer = 0, invulnTimer = 0, spreadTimer = 0, scoreMultTimer = 0, shieldHP = 0;
@@ -2827,6 +2946,10 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             gisCount.textContent = 'x' + specialCharges;
             gisCount.classList.toggle('empty', specialCharges <= 0);
         }
+        const gisHint = document.getElementById('gis-hint');
+        if (gisHint) {
+            gisHint.classList.toggle('visible', specialCharges > 0);
+        }
 
         // ── Threats counter ──
         const threatsEl = document.getElementById('threats-display');
@@ -2982,28 +3105,37 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         const status = document.getElementById('go-status');
         status.textContent = cleared ? '✓ VECTOR COMPLETE' : '✗ MISSION FAILED';
         status.className = 'go-status ' + (cleared ? 'cleared' : 'failed');
+        // Reset status animation
+        status.style.animation = 'none'; status.offsetHeight;
+        status.style.animationDelay = '1.8s'; status.style.animation = '';
 
         // Grade
         const grade = calculateGrade();
         const gradeEl = document.getElementById('go-grade');
         gradeEl.textContent = grade;
         gradeEl.className = 'go-grade ' + grade.toLowerCase();
-        // Reset animation
         gradeEl.style.animation = 'none';
-        gradeEl.offsetHeight; // force reflow
+        gradeEl.offsetHeight;
+        gradeEl.style.animationDelay = '1.6s';
         gradeEl.style.animation = '';
 
-        // Reset stat animations
-        document.querySelectorAll('.stat-group').forEach(el => {
+        // Reset stat animations with stagger
+        document.querySelectorAll('.stat-group').forEach((el, i) => {
             el.style.animation = 'none';
             el.offsetHeight;
+            el.style.animationDelay = (0.8 + i * 0.2) + 's';
             el.style.animation = '';
         });
 
+        // Reset frame animation
+        const frame = go.querySelector('.go-frame');
+        if (frame) { frame.style.animation = 'none'; frame.offsetHeight; frame.style.animation = ''; }
+
         document.getElementById('callsign-wrap').style.display = 'block';
         document.getElementById('retry-msg').style.display = 'none';
+        document.getElementById('go-leaderboard').style.display = 'none';
         document.getElementById('callsign-input').value = '';
-        setTimeout(() => document.getElementById('callsign-input').focus(), 500);
+        setTimeout(() => document.getElementById('callsign-input').focus(), 800);
     }
 
     document.getElementById('callsign-btn').addEventListener('click', submitCallsign);
@@ -3011,10 +3143,34 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     function submitCallsign() {
         let n = document.getElementById('callsign-input').value.trim().toUpperCase();
         if (!n) n = '??'; if (n.length === 1) n += '_';
-        saveScore(n.slice(0, 2), score);
+        const callsign = n.slice(0, 2);
+        saveScore(callsign, score);
         callsignSubmitted = true;
         document.getElementById('callsign-wrap').style.display = 'none';
+        // Show leaderboard
+        showLeaderboard(callsign, score);
         document.getElementById('retry-msg').style.display = 'block';
+    }
+    function showLeaderboard(currentName, currentScore) {
+        const lb = document.getElementById('go-leaderboard');
+        const list = document.getElementById('go-lb-list');
+        if (!lb || !list) return;
+        const scores = loadScores();
+        if (scores.length === 0) return;
+        lb.style.display = 'block';
+        // Reset animation
+        lb.style.animation = 'none'; lb.offsetHeight; lb.style.animation = '';
+        let html = '';
+        const top5 = scores.slice(0, 5);
+        top5.forEach((s, i) => {
+            const isCurrent = (s.name === currentName && s.score === currentScore);
+            html += '<div class="go-lb-row' + (isCurrent ? ' current' : '') + '">';
+            html += '<span class="go-lb-rank">' + (i+1) + '.</span>';
+            html += '<span class="go-lb-name">' + s.name + '</span>';
+            html += '<span class="go-lb-score">' + s.score.toLocaleString() + '</span>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
     }
     document.getElementById('retry-msg').addEventListener('click', startGame);
     document.getElementById('title-screen').addEventListener('click', () => {
@@ -3200,25 +3356,25 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     function pause(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     async function runIntroSequence() {
-        await pause(500);
-        await typeText('> INITIALIZING SYSTEMS...', 30);
-        await pause(600);
-        await typeText('> LOADING VISTA VECTOR CORE v1.0', 25);
-        await pause(400);
-        await typeText('> THREAT MATRIX.............. ONLINE', 20);
-        await pause(300);
-        await typeText('> WEAPONS ARRAY............. ARMED', 20);
-        await pause(300);
-        await typeText('> NAVIGATION GRID........... LOCKED', 20);
-        await pause(500);
+        await pause(200);
+        await typeText('> INITIALIZING SYSTEMS...', 12);
+        await pause(200);
+        await typeText('> LOADING VISTA VECTOR CORE v1.0', 10);
+        await pause(150);
+        await typeText('> THREAT MATRIX.............. ONLINE', 8);
+        await pause(100);
+        await typeText('> WEAPONS ARRAY............. ARMED', 8);
+        await pause(100);
+        await typeText('> NAVIGATION GRID........... LOCKED', 8);
+        await pause(200);
         await typeText('', 0); // blank line
-        await typeText('> ALL SYSTEMS NOMINAL', 25);
-        await pause(600);
+        await typeText('> ALL SYSTEMS NOMINAL', 10);
+        await pause(250);
         await typeText('', 0);
         await typeLogoText('VISTA VECTOR');
-        await pause(400);
+        await pause(200);
         await typeText('', 0);
-        await typeText('> PRESS ANY KEY', 30);
+        await typeText('> PRESS ANY KEY', 12);
 
         // Wait for key or click
         await new Promise(resolve => {
@@ -3242,7 +3398,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             introEl.style.display = 'none';
             gameState = 'TITLE';
             document.getElementById('title-screen').style.display = 'flex';
-        }, 800);
+        }, 400);
     }
 
     function update(dt) {
@@ -3285,13 +3441,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             playerMesh.rotation.z = -player.bankAngle;
             playerMesh.rotation.x = player.bankAngle * 0.15;
 
-            // Reticle projects ship's forward aim point — moves with the ship like Star Fox
+            // Reticle tracks mouse directly — feels like a true shooter aim
             const reticleEl = document.querySelector('.hud-reticle-system');
             if (reticleEl) {
-                const aimWorld = _v3.set(player.x, player.y + 1, -25);
-                aimWorld.project(camera);
-                const rx = clamp((aimWorld.x * 0.5 + 0.5) * 100, 5, 95);
-                const ry = clamp((-aimWorld.y * 0.5 + 0.5) * 100, 5, 95);
+                const rx = clamp((input.ndcX * 0.5 + 0.5) * 100, 2, 98);
+                const ry = clamp((-input.ndcY * 0.5 + 0.5) * 100, 2, 98);
                 reticleEl.style.left = rx + '%';
                 reticleEl.style.top = ry + '%';
 
