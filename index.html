@@ -1197,8 +1197,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         reticleReturnSpeed: 4.0,    // how fast reticle returns to center when idle
 
         // Ship follow (trails behind reticle at ~40% responsiveness)
-        shipFollowScale: 0.40,     // 40% of gap per frame — Star Fox feel
-        shipFollowMaxStep: 45,     // max world-units/sec the ship can chase
+        shipFollowScale: 0.65,     // 65% of gap per frame — snappier follow
+        shipFollowMaxStep: 70,     // max world-units/sec the ship can chase
         shipFollowMinStep: 0.05,   // minimum movement to avoid stalling
         shipLateralAmp: 1.0,       // ship chases reticle directly, no overshoot
         shipBoundsX: 0.42,         // ship max X as fraction of worldWidth — narrower than reticle
@@ -1235,9 +1235,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     const _lookTarget = new THREE.Vector3();
     const _lookMat = new THREE.Matrix4();
     const _up = new THREE.Vector3(0, 1, 0);
-    const CONVERGE_DIST_MAX = 180;
+    const CONVERGE_DIST_MAX = 120;
     const CONVERGE_DIST_MIN = 10;
-    const CONVERGE_SNAP_RADIUS = 100; // pixels — screen-space targeting threshold
+    const CONVERGE_SNAP_RADIUS = 100;
     let currentConvergeDist = CONVERGE_DIST_MAX;
     const _projV = new THREE.Vector3();
     scene.background = new THREE.Color(BG);
@@ -3639,7 +3639,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             player.x = clamp(player.x, -shipMaxX, shipMaxX);
             player.y = clamp(player.y, CFG.groundY + 3, CFG.shipBoundsYHigh);
 
-            // ── DYNAMIC CONVERGENCE — soft lock-on to nearest enemy under crosshair ──
+            // ── DYNAMIC CONVERGENCE — default 120, snaps to enemy depth under crosshair ──
             let targetConvergeDist = CONVERGE_DIST_MAX;
             let closestScreenDist = Infinity;
             const cursorPxX = input.x;
@@ -3664,7 +3664,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             currentConvergeDist += (targetConvergeDist - currentConvergeDist) * clamp(5 * dt, 0, 1);
 
             // ── STEP 3: SHIP ROTATION — lookAt convergence point + bank ──
-            // Unproject mouse NDC through camera (identical to bullet code)
             _aimNear.set(input.ndcX, input.ndcY, 0).unproject(camera);
             _aimFar.set(input.ndcX, input.ndcY, 1).unproject(camera);
             _aimDir.copy(_aimFar).sub(_aimNear).normalize();
