@@ -17,7 +17,7 @@
             -webkit-user-select: none;
             user-select: none;
         }
-        canvas { display: block; }
+        canvas { display: block; visibility: hidden; }
 
         /* ═══════════════════════════════════════════════════
            JARVIS HUD — Iron Man Holographic Interface
@@ -3237,6 +3237,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     function finishIntro() {
         const introEl = document.getElementById('intro-screen');
         introEl.classList.add('fade-out');
+        renderer.domElement.style.visibility = 'visible';
         setTimeout(() => {
             introEl.style.display = 'none';
             gameState = 'TITLE';
@@ -3412,6 +3413,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         document.getElementById('title-screen').style.display = 'none';
         document.getElementById('gameover-screen').style.display = 'none';
         document.getElementById('hud').style.display = 'block';
+        renderer.domElement.style.visibility = 'visible';
         cameraTransitioning = false;
         camera.position.set(baseCamPos.x, baseCamPos.y, 22);
         camera.lookAt(0, 1, -50);
