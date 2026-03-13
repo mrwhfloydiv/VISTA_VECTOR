@@ -1882,14 +1882,28 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         return new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
     })();
     const bulletMat = new THREE.MeshBasicMaterial({
-        color: 0xff2222, transparent: true, opacity: 0.95,
+        color: 0x44ffff, transparent: true, opacity: 0.95,
         blending: THREE.AdditiveBlending,
     });
     const bulletGlowGeo = new THREE.SphereGeometry(0.4, 6, 6);
     const bulletGlowMat = new THREE.MeshBasicMaterial({
-        color: 0xff4444, transparent: true, opacity: 0.2,
+        color: 0x88ffff, transparent: true, opacity: 0.25,
         blending: THREE.AdditiveBlending,
     });
+    // Plasma color cycle — shifts hue over bullet lifetime
+    const _plasmaColor = new THREE.Color();
+    function updatePlasmaColor(mat, glowMat, age) {
+        // Cycle through cyan → blue → magenta → white → cyan
+        const hue = (age * 0.8) % 1.0;  // full cycle every ~1.25s
+        const sat = 0.6 + Math.sin(age * 12) * 0.2; // shimmer saturation
+        const lit = 0.55 + Math.sin(age * 8) * 0.15;
+        _plasmaColor.setHSL(hue * 0.35 + 0.45, sat, lit); // range: cyan(0.5) → magenta(0.83)
+        mat.color.copy(_plasmaColor);
+        if (glowMat) {
+            _plasmaColor.setHSL(hue * 0.35 + 0.45, sat * 0.8, lit + 0.15);
+            glowMat.color.copy(_plasmaColor);
+        }
+    }
 
     // Bullet aiming via camera unprojection — converges at dynamic depth
     const _bulletNear = new THREE.Vector3();
@@ -1923,7 +1937,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         scene.add(mesh);
 
         bullets.push({
-            mesh,
+            mesh, glow,
+            age: Math.random() * 2, // offset so each bullet starts at different plasma hue
             vx: (dx / len) * CFG.bulletSpeed,
             vy: (dy / len) * CFG.bulletSpeed,
             vz: (dz / len) * CFG.bulletSpeed,
@@ -1955,6 +1970,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
             b.mesh.position.x += b.vx * dt;
             b.mesh.position.y += (b.vy || 0) * dt;
             b.mesh.position.z += b.vz * dt;
+            // Plasma color cycle + scale pulse
+            b.age += dt;
+            updatePlasmaColor(b.mesh.material, b.glow ? b.glow.material : null, b.age);
+            const pulse = 1.0 + Math.sin(b.age * 14) * 0.2;
+            b.mesh.scale.set(pulse, 1, pulse);
             if (b.mesh.position.z < CFG.enemySpawnZ - 20 || b.dead) {
                 scene.remove(b.mesh);
                 b.mesh.geometry.dispose();
