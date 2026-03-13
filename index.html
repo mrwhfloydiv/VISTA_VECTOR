@@ -632,7 +632,7 @@
         #intro-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; align-items: center; justify-content: center;
-            z-index: 25; background: #020306;
+            z-index: 25; background: #000;
             transition: opacity 0.8s ease-out;
         }
         #intro-screen.fade-out { opacity: 0; pointer-events: none; }
@@ -678,11 +678,10 @@
         }
 
         .go-frame {
-            position: relative; padding: 30px 40px;
+            position: relative; padding: 24px 32px;
             border: 1px solid rgba(181,217,238,0.15);
-            background: rgba(2,3,6,0.85);
-            max-width: 440px; width: 92%; z-index: 2;
-            max-height: 90vh; overflow-y: auto;
+            background: rgba(2,3,6,0.92);
+            max-width: 420px; width: 90%; z-index: 2;
             opacity: 0;
             animation: goFrameIn 0.8s ease-out 0.3s forwards;
             box-shadow: 0 0 80px rgba(2,3,6,0.9), 0 0 2px rgba(181,217,238,0.2),
@@ -707,7 +706,7 @@
             0%, 100% { opacity: 0.5; } 50% { opacity: 1; }
         }
 
-        .go-header { text-align: center; margin-bottom: 20px; }
+        .go-header { text-align: center; margin-bottom: 14px; }
         .go-header h2 {
             font-family: 'Space Grotesk', sans-serif; font-size: 32px;
             color: #b22c2e; font-weight: 700; letter-spacing: 4px;
@@ -754,7 +753,7 @@
             100% { opacity: 1; transform: translateY(0); }
         }
         .go-line {
-            width: 100%; height: 1px; margin: 0 auto 16px;
+            width: 100%; height: 1px; margin: 0 auto 10px;
             background: linear-gradient(90deg, transparent, rgba(181,217,238,0.2), transparent);
             animation: goLineExpand 0.6s ease-out 0.7s both;
         }
@@ -766,7 +765,7 @@
         /* Stats — Staggered slide-in with counting effect look */
         .stat-group {
             display: flex; justify-content: space-between; align-items: baseline;
-            padding: 7px 0; border-bottom: 1px solid rgba(181,217,238,0.05);
+            padding: 5px 0; border-bottom: 1px solid rgba(181,217,238,0.05);
             opacity: 0; animation: statSlide 0.5s ease-out forwards;
         }
         @keyframes statSlide {
@@ -785,9 +784,9 @@
 
         /* Grade Display — Epic slam with afterglow */
         .go-grade {
-            text-align: center; margin: 16px 0 6px;
+            text-align: center; margin: 10px 0 4px;
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 80px; font-weight: 700;
+            font-size: 64px; font-weight: 700;
             letter-spacing: 4px;
             opacity: 0; animation: gradeSlam 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
@@ -817,9 +816,9 @@
         }
 
         .go-status {
-            text-align: center; margin-top: 6px;
+            text-align: center; margin-top: 4px;
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 22px; font-weight: 700; letter-spacing: 3px;
+            font-size: 18px; font-weight: 700; letter-spacing: 3px;
             opacity: 0; animation: statusFlash 0.5s ease-out forwards;
         }
         @keyframes statusFlash {
@@ -831,9 +830,10 @@
 
         /* ── High Score Leaderboard — CRT Style ── */
         .go-leaderboard {
-            margin-top: 16px; padding: 12px 8px 8px;
+            margin-top: 10px; padding: 10px 8px 6px;
             border-top: 1px solid rgba(181,217,238,0.1);
             background: rgba(0,0,0,0.3);
+            animation: fadeInUp 0.5s ease-out forwards;
         }
         .go-leaderboard-title {
             font-family: 'IBM Plex Mono', monospace; font-size: 10px;
@@ -864,7 +864,7 @@
         .go-lb-row.current .go-lb-score { color: #ebaa1f; text-shadow: 0 0 10px rgba(235,170,31,0.4); }
 
         /* Callsign */
-        #callsign-wrap { margin-top: 16px; text-align: center; }
+        #callsign-wrap { margin-top: 12px; text-align: center; }
         .callsign-label {
             font-family: 'IBM Plex Mono', monospace; font-size: 9px;
             color: rgba(181,217,238,0.4); letter-spacing: 3px; margin-bottom: 6px;
@@ -1778,7 +1778,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         blending: THREE.AdditiveBlending,
     });
 
-    // Star Fox-style aiming: bullets fire from ship, angled toward reticle aim point
+    // Star Fox-style aiming: bullets fire from wings, aimed PARALLEL toward reticle direction
+    // All bullets share the same aim vector (from ship center to reticle) so they never cross
     function spawnBullet(x, y, spreadOffsetX) {
         const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
         mesh.position.set(x, y, CFG.playerZ - 2);
@@ -1787,17 +1788,17 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         mesh.add(glow);
         scene.add(mesh);
         const speed = CFG.bulletSpeed;
-        // Aim influence: shots angle toward where reticle is pointing
-        const aimX = reticle.x - x;  // offset from bullet spawn to reticle X
-        const aimY = reticle.y - y;  // offset from bullet spawn to reticle Y
-        const aimZ = CFG.shotConvergeZ;  // convergence distance
+        // Aim direction from SHIP CENTER (not bullet position) — keeps wing shots parallel
+        const aimX = reticle.x - player.x;
+        const aimY = reticle.y - player.y;
+        const aimZ = CFG.shotConvergeZ;
         const aimLen = Math.sqrt(aimX*aimX + aimY*aimY + aimZ*aimZ);
         const inf = CFG.shotAimInfluence;
         bullets.push({
             mesh,
             vx: (spreadOffsetX || 0) + (aimX / aimLen) * speed * inf,
             vy: (aimY / aimLen) * speed * inf,
-            vz: -speed * (1 - inf * 0.1), // slightly reduce forward speed when aiming off-center
+            vz: -speed * (1 - inf * 0.1),
         });
         shotsFired++;
     }
